@@ -1,0 +1,3 @@
+port: 12395
+dbFile: "data/share.db"
+logPath: "logs"

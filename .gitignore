@@ -1,0 +1,10 @@
+logs
+output
+data/share.db
+session.json
+.idea
+
+fe/node_modules
+fe/llm-prompt.txt
+fe/dist
+fe/.idea
