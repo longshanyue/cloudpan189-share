@@ -38,18 +38,6 @@ docker run -d \
   xxcheng123/cloudpan189-share:latest
 ```
 
-### Docker 环境变量
-```sh
-docker run -d \
-  --name cloudpan189-share \
-  -p 12395:12395 \
-  -v $(pwd)/data:/app/data \
-  -e PORT=12395 \
-  -e DB_FILE=/app/data/share.db \
-  --restart unless-stopped \
-  xxcheng123/cloudpan189-share:latest
-```
-
 ### 访问系统
 - Web 界面: `http://服务器IP:12395`
 - WebDAV 地址: `http://服务器IP:12395/dav`
@@ -68,7 +56,7 @@ http(s)://你的网站地址/dav
 ```
 
 ### 示例地址
-```http
+```
 http://localhost:12395/dav
 ```
 
