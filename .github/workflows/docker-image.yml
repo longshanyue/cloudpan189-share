@@ -14,6 +14,7 @@ on:
 env:
   APP_NAME: cloudpan189-share
   DOCKERHUB_REPO: xxcheng123/cloudpan189-share
+  MODULE_NAME: github.com/xxcheng123/cloudpan189-share
 
 jobs:
   docker:
@@ -21,6 +22,8 @@ jobs:
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整的 git 历史，用于生成构建信息
 
       - name: 🔧 Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -34,35 +37,108 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: 📊 Generate App Version
+      - name: 📊 Generate build metadata
+        id: meta
         run: |
+          # 设置版本
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "APP_VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
           else
             echo "APP_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           fi
+          
+          # 生成构建信息 - 与 Makefile 保持一致
+          echo "VAR_COMMIT=$(git rev-parse HEAD)" >> $GITHUB_ENV
+          echo "VAR_BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_ENV
+          echo "VAR_GIT_SUMMARY=$(git describe --tags --dirty --always 2>/dev/null || git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "VAR_GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
+          
+          # 输出构建信息用于调试
+          echo "🔍 Build Information:"
+          echo "  Version: ${APP_VERSION:-${GITHUB_REF#refs/tags/}}"
+          echo "  Commit: $(git rev-parse HEAD)"
+          echo "  Build Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "  Git Summary: $(git describe --tags --dirty --always 2>/dev/null || git rev-parse --short HEAD)"
+          echo "  Git Branch: $(git rev-parse --abbrev-ref HEAD)"
 
       - name: 🔨 Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64  # 移除 linux/386
+          platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            APP_NAME=${{ env.APP_NAME }}
-            APP_VERSION=${{ env.APP_VERSION }}
+            MODULE_NAME=${{ env.MODULE_NAME }}
+            VAR_COMMIT=${{ env.VAR_COMMIT }}
+            VAR_BUILD_DATE=${{ env.VAR_BUILD_DATE }}
+            VAR_GIT_SUMMARY=${{ env.VAR_GIT_SUMMARY }}
+            VAR_GIT_BRANCH=${{ env.VAR_GIT_BRANCH }}
+            OUTPUT_DIR=/app
+            BINARY_NAME=share
           tags: |
             ${{ env.DOCKERHUB_REPO }}:latest
             ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: 🔍 Inspect multi-arch image
+        run: |
+          echo "🔍 检查多架构镜像信息..."
+          docker buildx imagetools inspect ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}
+
+      - name: 🧪 Test images
+        run: |
+          echo "🧪 测试不同架构的镜像..."
+          
+          echo "Testing AMD64 image..."
+          docker run --rm --platform linux/amd64 ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }} file /app/share
+          docker run --rm --platform linux/amd64 ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }} /app/share --version 2>/dev/null || echo "Version command may not be available"
+          
+          echo "Testing ARM64 image..."
+          docker run --rm --platform linux/arm64 ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }} file /app/share
+          docker run --rm --platform linux/arm64 ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }} /app/share --version 2>/dev/null || echo "Version command may not be available"
+
       - name: 📋 Docker Image Info
         run: |
           echo "🎉 Docker 镜像构建完成！"
+          echo ""
           echo "📦 镜像标签:"
           echo "  - ${{ env.DOCKERHUB_REPO }}:latest"
           echo "  - ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}"
           echo ""
+          echo "🏗️ 支持的架构:"
+          echo "  - linux/amd64"
+          echo "  - linux/arm64"
+          echo ""
+          echo "📋 构建信息:"
+          echo "  - Commit: ${{ env.VAR_COMMIT }}"
+          echo "  - Build Date: ${{ env.VAR_BUILD_DATE }}"
+          echo "  - Git Summary: ${{ env.VAR_GIT_SUMMARY }}"
+          echo "  - Git Branch: ${{ env.VAR_GIT_BRANCH }}"
+          echo ""
           echo "🚀 使用方法:"
-          echo "  docker run -p 12395:12395 ${{ env.DOCKERHUB_REPO }}:latest"
+          echo ""
+          echo "# 基本运行"
+          echo "docker run -d \\"
+          echo "  --name ${{ env.APP_NAME }} \\"
+          echo "  -p 12395:12395 \\"
+          echo "  -v \$(pwd)/data:/app/data \\"
+          echo "  --restart unless-stopped \\"
+          echo "  ${{ env.DOCKERHUB_REPO }}:latest"
+          echo ""
+          echo "# 指定架构运行"
+          echo "docker run --platform linux/arm64 -d ${{ env.DOCKERHUB_REPO }}:latest"
+          echo ""
+          echo "# Docker Compose 示例"
+          echo "version: '3.8'"
+          echo "services:"
+          echo "  cloudpan189-share:"
+          echo "    image: ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}"
+          echo "    container_name: ${{ env.APP_NAME }}"
+          echo "    ports:"
+          echo "      - \"12395:12395\""
+          echo "    volumes:"
+          echo "      - ./data:/app/data"
+          echo "    restart: unless-stopped"
+          echo "    environment:"
+          echo "      - TZ=Asia/Shanghai"
