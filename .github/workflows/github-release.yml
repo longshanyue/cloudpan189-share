@@ -370,7 +370,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.VERSION }}
-          name: "🚀 发布 ${{ env.VERSION }}"
+          name: "${{ env.VERSION }}"
           body: |
             ${{ env.CHANGELOG }}
             
@@ -404,3 +404,5 @@ jobs:
             
             # 运行（Web 界面将在 http://localhost:12395 可用）
             ./share-linux-amd64
+          files: |
+            release-files/*
