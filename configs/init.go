@@ -4,6 +4,11 @@ import (
 	"crypto/md5"
 	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"time"
+
 	"github.com/glebarez/sqlite"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	logger2 "github.com/xxcheng123/cloudpan189-share/internal/pkgs/logger"
@@ -12,8 +17,6 @@ import (
 	"github.com/zeromicro/go-zero/core/conf"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"runtime"
-	"time"
 )
 
 var (
@@ -39,6 +42,22 @@ func init() {
 
 func Init() {
 	var err error
+
+	// 先判断数据库目录是否存在
+	dbDir := filepath.Dir(c.DBFile)
+	if dbDir != "" && dbDir != "." {
+		// 检查目录是否存在
+		if _, err = os.Stat(dbDir); os.IsNotExist(err) {
+			// 目录不存在，创建目录
+			if err = os.MkdirAll(dbDir, 0755); err != nil {
+				panic(fmt.Sprintf("创建数据库目录失败: %v", err))
+			}
+			logger.Info("数据库目录已创建", zap.String("path", dbDir))
+		} else if err != nil {
+			// 其他错误（如权限问题）
+			panic(fmt.Sprintf("检查数据库目录失败: %v", err))
+		}
+	}
 
 	db, err = gorm.Open(sqlite.Open(c.DBFile), &gorm.Config{
 		NowFunc: func() time.Time {

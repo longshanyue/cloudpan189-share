@@ -238,28 +238,40 @@ jobs:
 
       - name: 📦 创建压缩包
         run: |
+          # 复制整个 etc 目录到输出目录
+          cp -r etc output/
+
+          # 进入输出目录
           cd output
-          
+
+          # 显示目录结构
+          echo "📋 当前目录结构："
+          find . -type f | sort
+
           if [ "${{ matrix.goos }}" = "windows" ]; then
             echo "📦 为 Windows 创建 ZIP 压缩包..."
-            zip -9 ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.zip ${{ env.BINARY_NAME }}-${{ matrix.suffix }}${{ matrix.ext }}
+            zip -9 -r ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.zip \
+              ${{ env.BINARY_NAME }}-${{ matrix.suffix }}${{ matrix.ext }} \
+              etc/
             echo "✅ 已创建: ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.zip"
-          
+
             # 验证 ZIP 文件
             if command -v unzip >/dev/null 2>&1; then
-              echo "🔍 验证 ZIP 压缩包..."
-              unzip -t ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.zip
+              echo "🔍 验证 ZIP 压缩包内容..."
+              unzip -l ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.zip
             fi
           else
             echo "📦 为 ${{ matrix.goos }} 创建 TAR.GZ 压缩包..."
-            tar -czf ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.tar.gz ${{ env.BINARY_NAME }}-${{ matrix.suffix }}${{ matrix.ext }}
+            tar -czf ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.tar.gz \
+              ${{ env.BINARY_NAME }}-${{ matrix.suffix }}${{ matrix.ext }} \
+              etc/
             echo "✅ 已创建: ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.tar.gz"
-          
+
             # 验证 TAR.GZ 文件
-            echo "🔍 验证 TAR.GZ 压缩包..."
+            echo "🔍 验证 TAR.GZ 压缩包内容..."
             tar -tzf ${{ env.BINARY_NAME }}-${{ matrix.suffix }}.tar.gz
           fi
-          
+
           # 显示最终文件信息
           echo "📊 最终压缩包信息："
           ls -lh ${{ env.BINARY_NAME }}-${{ matrix.suffix }}*
