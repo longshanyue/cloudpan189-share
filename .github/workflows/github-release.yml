@@ -335,20 +335,36 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          merge-multiple: true
 
-      - name: 📋 验证下载的文件
+      - name: 🔧 整理发布文件
         run: |
-          echo "📋 已下载的产物："
-          find artifacts -type f -name "*.tar.gz" -o -name "*.zip" | sort
-          echo ""
-          echo "📊 文件大小和校验和："
-          find artifacts -type f -name "*.tar.gz" -o -name "*.zip" | while read file; do
-            echo "文件: $(basename "$file")"
-            echo "  大小: $(ls -lh "$file" | awk '{print $5}')"
-            echo "  SHA256: $(sha256sum "$file" | cut -d' ' -f1)"
-            echo ""
+          echo "🔧 整理发布文件..."
+          
+          # 创建发布目录
+          mkdir -p release-files
+          
+          # 查看下载的文件结构
+          echo "📋 下载的文件结构："
+          find artifacts -type f | sort
+          
+          # 移动所有压缩包到发布目录
+          find artifacts -name "*.tar.gz" -o -name "*.zip" | while read file; do
+            filename=$(basename "$file")
+            echo "📦 移动文件: $filename"
+            cp "$file" "release-files/$filename"
           done
+          
+          # 验证发布文件
+          echo "📊 准备发布的文件："
+          ls -la release-files/
+          
+          # 生成校验和文件
+          cd release-files
+          echo "🔐 生成校验和..."
+          sha256sum *.tar.gz *.zip > SHA256SUMS 2>/dev/null || true
+          
+          echo "📋 校验和文件内容："
+          cat SHA256SUMS || echo "未生成校验和文件"
 
       - name: 📋 创建 GitHub 发布
         uses: softprops/action-gh-release@v2
