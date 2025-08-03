@@ -19,33 +19,34 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v2
-      -
-        name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-      -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-      -
-        name: Login to DockerHub
-        uses: docker/login-action@v1
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔑 Login to DockerHub
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      -
-        name: Generate App Version
-        run: echo APP_VERSION=`git describe --tags --always` >> $GITHUB_ENV
-      -
-        name: Build and push
-        uses: docker/build-push-action@v2
+
+      - name: 📊 Generate App Version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "APP_VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          else
+            echo "APP_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          fi
+
+      - name: 🔨 Build and push
+        uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: |
-            linux/386
-            linux/amd64
-            linux/arm64
+          platforms: linux/amd64,linux/arm64  # 移除 linux/386
           push: true
           build-args: |
             APP_NAME=${{ env.APP_NAME }}
@@ -53,3 +54,15 @@ jobs:
           tags: |
             ${{ env.DOCKERHUB_REPO }}:latest
             ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 📋 Docker Image Info
+        run: |
+          echo "🎉 Docker 镜像构建完成！"
+          echo "📦 镜像标签:"
+          echo "  - ${{ env.DOCKERHUB_REPO }}:latest"
+          echo "  - ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}"
+          echo ""
+          echo "🚀 使用方法:"
+          echo "  docker run -p 12395:12395 ${{ env.DOCKERHUB_REPO }}:latest"
