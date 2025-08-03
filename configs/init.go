@@ -52,7 +52,6 @@ func Init() {
 			if err = os.MkdirAll(dbDir, 0755); err != nil {
 				panic(fmt.Sprintf("创建数据库目录失败: %v", err))
 			}
-			logger.Info("数据库目录已创建", zap.String("path", dbDir))
 		} else if err != nil {
 			// 其他错误（如权限问题）
 			panic(fmt.Sprintf("检查数据库目录失败: %v", err))
@@ -61,8 +60,13 @@ func Init() {
 
 	db, err = gorm.Open(sqlite.Open(c.DBFile), &gorm.Config{
 		NowFunc: func() time.Time {
-			// 使用中国时区
-			loc, _ := time.LoadLocation("Asia/Shanghai")
+			// 使用中国时区，处理加载失败的情况
+			loc, err := time.LoadLocation("Asia/Shanghai")
+			if err != nil {
+				// 如果加载失败，使用固定偏移量 UTC+8
+				loc = time.FixedZone("CST", 8*3600)
+			}
+
 			return time.Now().In(loc)
 		},
 	})
