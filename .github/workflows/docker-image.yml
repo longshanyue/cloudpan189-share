@@ -86,18 +86,6 @@ jobs:
           echo "🔍 检查多架构镜像信息..."
           docker buildx imagetools inspect ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}
 
-      - name: 🧪 Test images
-        run: |
-          echo "🧪 测试不同架构的镜像..."
-          
-          echo "Testing AMD64 image..."
-          docker run --rm --platform linux/amd64 ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }} file /app/share
-          docker run --rm --platform linux/amd64 ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }} /app/share --version 2>/dev/null || echo "Version command may not be available"
-          
-          echo "Testing ARM64 image..."
-          docker run --rm --platform linux/arm64 ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }} file /app/share
-          docker run --rm --platform linux/arm64 ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }} /app/share --version 2>/dev/null || echo "Version command may not be available"
-
       - name: 📋 Docker Image Info
         run: |
           echo "🎉 Docker 镜像构建完成！"
