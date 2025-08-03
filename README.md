@@ -37,6 +37,7 @@ docker run -d \
   --restart unless-stopped \
   xxcheng123/cloudpan189-share:latest
 ```
+更多请参考文档：[CloudPan189 Share 快速开始文档](docs/1.quick_start.md)
 
 ### 访问系统
 - Web 界面: `http://服务器IP:12395`
