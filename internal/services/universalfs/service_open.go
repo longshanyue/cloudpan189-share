@@ -4,18 +4,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/xxcheng123/cloudpan189-share/internal/models"
-	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
-	"github.com/xxcheng123/cloudpan189-share/internal/shared"
-	"gorm.io/gorm"
 	"net/http"
 	"net/url"
 	"path"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/xxcheng123/cloudpan189-share/internal/models"
+	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
+	"github.com/xxcheng123/cloudpan189-share/internal/shared"
+	"gorm.io/gorm"
 )
 
 func (s *service) Open(prefix string, format string) gin.HandlerFunc {

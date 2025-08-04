@@ -12,6 +12,7 @@ type Setting struct {
 	BaseURL                  string    `gorm:"column:base_url;type:varchar(255);not null;default:''" json:"baseURL"`                          // base url
 	EnableTopFileAutoRefresh bool      `gorm:"column:enable_top_file_auto_refresh;type:tinyint(1);default:1" json:"enableTopFileAutoRefresh"` // 挂载文件自动刷新
 	Initialized              bool      `gorm:"column:initialized;type:tinyint(1);default:0" json:"initialized"`                               // 是否初始化完成
+	JobThreadCount           int       `gorm:"column:job_thread_count;type:tinyint(1);default:1" json:"jobThreadCount"`                       // 任务线程数
 	CreatedAt                time.Time `gorm:"column:created_at;autoCreateTime;type:datetime;default:CURRENT_TIMESTAMP" json:"createdAt"`
 	UpdatedAt                time.Time `gorm:"column:updated_at;autoUpdateTime;type:datetime;default:CURRENT_TIMESTAMP;on update:CURRENT_TIMESTAMP" json:"updatedAt"`
 }

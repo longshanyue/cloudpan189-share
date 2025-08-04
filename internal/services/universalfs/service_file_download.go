@@ -3,6 +3,13 @@ package universalfs
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"github.com/xxcheng123/cloudpan189-interface/client"
@@ -12,11 +19,6 @@ import (
 	"github.com/xxcheng123/multistreamer"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"io"
-	"net/http"
-	"net/url"
-	"strconv"
-	"time"
 )
 
 type fileDownloadRequest struct {
@@ -107,6 +109,24 @@ func (s *service) FileDownload() gin.HandlerFunc {
 	}
 }
 
+// 全局HTTP客户端，复用连接
+var globalHTTPClient = &http.Client{
+	Timeout: 0,
+	Transport: &http.Transport{
+		DisableKeepAlives:     false,
+		MaxIdleConns:          200, // 增加连接池
+		MaxIdleConnsPerHost:   20,  // 每个host更多连接
+		MaxConnsPerHost:       50,  // 总连接数限制
+		IdleConnTimeout:       120 * time.Second,
+		TLSHandshakeTimeout:   5 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		DisableCompression:    true,       // 禁用压缩
+		WriteBufferSize:       128 * 1024, // 128KB写缓冲
+		ReadBufferSize:        128 * 1024, // 128KB读缓冲
+		ForceAttemptHTTP2:     false,      // 禁用HTTP2
+	},
+}
+
 func (s *service) doResponse(ctx *gin.Context, url string) {
 	if shared.Setting.MultipleStream {
 		ctx.Header("X-Transfer-Type", "multi_stream")
@@ -124,7 +144,6 @@ func (s *service) doResponse(ctx *gin.Context, url string) {
 				"code":    http.StatusInternalServerError,
 				"message": fmt.Sprintf("解析Range失败: %v", err),
 			})
-
 			return
 		} else if yes {
 			opts = append(opts, multistreamer.WithRange(rangeSpec.Start, rangeSpec.End))
@@ -138,7 +157,6 @@ func (s *service) doResponse(ctx *gin.Context, url string) {
 				"code":    http.StatusInternalServerError,
 				"message": fmt.Sprintf("启动失败: %v", err),
 			})
-
 			return
 		}
 
@@ -147,7 +165,6 @@ func (s *service) doResponse(ctx *gin.Context, url string) {
 				"code":    http.StatusInternalServerError,
 				"message": fmt.Sprintf("获取响应头失败: %v", err),
 			})
-
 			return
 		} else {
 			for k, v := range header {
@@ -155,57 +172,278 @@ func (s *service) doResponse(ctx *gin.Context, url string) {
 			}
 		}
 
-		// 设置 http code
 		ctx.Status(httpCode)
-
 		_ = mt.Execute()
+
 	} else if shared.Setting.LocalProxy {
-		ctx.Header("X-Transfer-Type", "local_proxy")
-		// 创建请求
-		req, err := http.NewRequest(http.MethodGet, url, nil)
-		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"code":    http.StatusInternalServerError,
-				"message": err.Error(),
-			})
-			return
-		}
-
-		for k, v := range ctx.Request.Header {
-			req.Header.Set(k, v[0])
-		}
-
-		// 设置超时
-		httpClient := &http.Client{
-			Timeout: 30 * time.Second,
-		}
-
-		// 发送请求
-		resp, err := httpClient.Do(req)
-		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"code":    http.StatusInternalServerError,
-				"message": fmt.Sprintf("代理请求失败: %v", err),
-			})
-			return
-		}
-		defer resp.Body.Close()
-
-		for k, v := range resp.Header {
-			ctx.Header(k, v[0])
-		}
-
-		ctx.Status(resp.StatusCode)
-
-		_, err = io.Copy(ctx.Writer, resp.Body)
-		if err != nil {
-			s.logger.Error("文件下载转发失败: %v", zap.Error(err))
-		}
+		s.handleLocalProxy(ctx, url)
 	} else {
 		ctx.Header("X-Transfer-Type", "redirect")
 		ctx.Redirect(http.StatusFound, url)
 	}
+}
 
+// 单独处理 LocalProxy 逻辑
+func (s *service) handleLocalProxy(ctx *gin.Context, url string) {
+	start := time.Now()
+	ctx.Header("X-Transfer-Type", "local_proxy")
+
+	// 使用请求的上下文，支持取消
+	req, err := http.NewRequestWithContext(ctx.Request.Context(), http.MethodGet, url, nil)
+	if err != nil {
+		s.logger.Error("创建代理请求失败", zap.Error(err))
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"code":    http.StatusInternalServerError,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// 智能复制请求头
+	s.copyOptimizedHeaders(ctx.Request.Header, req.Header)
+
+	// 检查是否是Range请求
+	rangeHeader := ctx.Request.Header.Get("Range")
+	isRangeRequest := rangeHeader != ""
+
+	if isRangeRequest {
+		// Range请求使用更激进的优化
+		req.Header.Set("Connection", "keep-alive")
+	}
+
+	// 发送请求
+	resp, err := globalHTTPClient.Do(req)
+	if err != nil {
+		// 检查是否是上下文取消（客户端断开）
+		if ctx.Request.Context().Err() != nil {
+			s.logger.Info("客户端断开连接", zap.String("url", url))
+			return
+		}
+
+		s.logger.Error("代理请求失败", zap.Error(err), zap.String("url", url))
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"code":    http.StatusInternalServerError,
+			"message": fmt.Sprintf("代理请求失败: %v", err),
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	// 优化响应头复制
+	s.copyOptimizedResponseHeaders(resp.Header, ctx)
+
+	ctx.Status(resp.StatusCode)
+
+	// 立即刷新响应头
+	if flusher, ok := ctx.Writer.(http.Flusher); ok {
+		flusher.Flush()
+	}
+
+	// 根据请求类型选择不同的传输策略
+	var copyErr error
+	if isRangeRequest || resp.ContentLength < 1024*1024 { // 小于1MB
+		// 小文件或Range请求：快速传输
+		copyErr = s.fastCopy(ctx, ctx.Writer, resp.Body)
+	} else {
+		// 大文件：流式传输
+		copyErr = s.streamCopy(ctx, ctx.Writer, resp.Body)
+	}
+
+	// 性能监控
+	duration := time.Since(start)
+	if copyErr != nil {
+		if s.isConnectionError(copyErr) {
+			s.logger.Info("客户端连接断开",
+				zap.String("url", url),
+				zap.Duration("duration", duration),
+			)
+		} else {
+			s.logger.Error("文件下载转发失败",
+				zap.Error(copyErr),
+				zap.String("url", url),
+				zap.Duration("duration", duration),
+			)
+		}
+	} else {
+		s.logger.Info("代理请求完成",
+			zap.String("url", url),
+			zap.Duration("duration", duration),
+			zap.String("user_agent", ctx.Request.UserAgent()),
+		)
+
+		// 如果超过5秒，记录警告
+		if duration > 5*time.Second {
+			s.logger.Warn("代理请求较慢",
+				zap.String("url", url),
+				zap.Duration("duration", duration),
+			)
+		}
+	}
+}
+
+// 优化的请求头复制
+func (s *service) copyOptimizedHeaders(src, dst http.Header) {
+	// 只复制必要的头
+	importantHeaders := []string{
+		"Range", "If-Range", "If-Modified-Since", "If-None-Match",
+		"User-Agent", "Accept", "Accept-Encoding", "Authorization",
+		"Referer", "Origin",
+	}
+
+	for _, header := range importantHeaders {
+		if value := src.Get(header); value != "" {
+			dst.Set(header, value)
+		}
+	}
+}
+
+// 优化的响应头复制
+func (s *service) copyOptimizedResponseHeaders(src http.Header, ctx *gin.Context) {
+	// 重要的响应头
+	importantHeaders := []string{
+		"Content-Type", "Content-Length", "Content-Range",
+		"Accept-Ranges", "Last-Modified", "ETag", "Cache-Control",
+		"Content-Disposition", "Content-Encoding",
+	}
+
+	for _, header := range importantHeaders {
+		if value := src.Get(header); value != "" {
+			ctx.Header(header, value)
+		}
+	}
+
+	// 添加性能优化头
+	ctx.Header("Connection", "keep-alive")
+	ctx.Header("Keep-Alive", "timeout=120, max=100")
+}
+
+// 快速复制（小文件）
+func (s *service) fastCopy(ctx *gin.Context, dst io.Writer, src io.Reader) error {
+	// 使用更大的缓冲区一次性读取
+	buf := make([]byte, 256*1024) // 256KB
+	_, err := io.CopyBuffer(dst, src, buf)
+
+	if flusher, ok := dst.(http.Flusher); ok {
+		flusher.Flush()
+	}
+
+	return err
+}
+
+// 优化的流式复制
+func (s *service) streamCopy(ctx *gin.Context, dst io.Writer, src io.Reader) error {
+	// 使用更大的缓冲区 (128KB)
+	buf := make([]byte, 128*1024)
+	flusher, canFlush := dst.(http.Flusher)
+
+	var written int64
+	flushInterval := 0
+
+	for {
+		// 检查连接状态
+		select {
+		case <-ctx.Request.Context().Done():
+			return ctx.Request.Context().Err()
+		default:
+		}
+
+		// 设置读取超时
+		if conn, ok := src.(interface{ SetReadDeadline(time.Time) error }); ok {
+			conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+		}
+
+		nr, er := src.Read(buf)
+		if nr > 0 {
+			nw, ew := dst.Write(buf[0:nr])
+			if ew != nil {
+				return ew
+			}
+			if nr != nw {
+				return io.ErrShortWrite
+			}
+
+			written += int64(nw)
+			flushInterval++
+
+			// 每16KB或每10次写入就刷新一次
+			if canFlush && (flushInterval%10 == 0 || written%16384 == 0) {
+				flusher.Flush()
+			}
+		}
+
+		if er != nil {
+			if er != io.EOF {
+				return er
+			}
+			break
+		}
+	}
+
+	// 最终刷新
+	if canFlush {
+		flusher.Flush()
+	}
+
+	return nil
+}
+
+// 检查是否是连接相关的错误
+func (s *service) isConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := strings.ToLower(err.Error())
+	connectionErrors := []string{
+		"connection was forcibly closed",
+		"wsasend",
+		"broken pipe",
+		"connection reset by peer",
+		"client disconnected",
+		"context canceled",
+		"context deadline exceeded",
+		"use of closed network connection",
+		"connection refused",
+		"no route to host",
+	}
+
+	for _, connErr := range connectionErrors {
+		if strings.Contains(errStr, connErr) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ConnectionMonitorMiddleware 连接监控中间件
+func (s *service) ConnectionMonitorMiddleware() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		// 创建一个可以取消的上下文
+		ctxWithCancel, cancel := context.WithCancel(ctx.Request.Context())
+		defer cancel()
+
+		// 替换请求上下文
+		ctx.Request = ctx.Request.WithContext(ctxWithCancel)
+
+		// 使用 recover 捕获 panic
+		defer func() {
+			if r := recover(); r != nil {
+				if s.isConnectionError(fmt.Errorf("%v", r)) {
+					// 连接断开导致的 panic，记录日志但不报错
+					s.logger.Info("连接断开导致的异常", zap.Any("error", r))
+				} else {
+					// 其他 panic 正常处理
+					s.logger.Error("处理请求时发生异常", zap.Any("error", r))
+					if !ctx.Writer.Written() {
+						ctx.AbortWithStatus(http.StatusInternalServerError)
+					}
+				}
+			}
+		}()
+
+		ctx.Next()
+	}
 }
 
 type DoResult struct {

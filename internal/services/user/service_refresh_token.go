@@ -1,11 +1,12 @@
 package user
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"go.uber.org/zap"
-	"net/http"
-	"time"
 )
 
 // RefreshToken 刷新Token模型

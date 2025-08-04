@@ -2,12 +2,13 @@ package setting
 
 import (
 	"context"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"time"
 )
 
 type Service interface {
@@ -20,6 +21,7 @@ type Service interface {
 	ModifyBaseURL() gin.HandlerFunc
 	ToggleEnableTopFileAutoRefresh() gin.HandlerFunc
 	InitSystem() gin.HandlerFunc
+	ModifyJobThreadCount() gin.HandlerFunc
 }
 
 type service struct {

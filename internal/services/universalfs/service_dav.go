@@ -97,17 +97,18 @@ func (s *service) generatePropfindResponse(ctx *gin.Context, fileInfo *FileInfo)
 	xmlResponse.WriteString(`<?xml version="1.0" encoding="utf-8"?>`)
 	xmlResponse.WriteString(`<D:multistatus xmlns:D="DAV:">`)
 
-	// 添加当前文件/文件夹的响应
-	s.addPropResponse(&xmlResponse, fileInfo, ctx.Request.URL.Path)
+	// 当前路径处理
+	currentPath := s.normalizeWebDAVPath(ctx.Request.URL.Path)
+	if fileInfo.IsFolder == 1 && !strings.HasSuffix(currentPath, "/") {
+		currentPath += "/"
+	}
+
+	s.addPropResponse(&xmlResponse, fileInfo, currentPath)
 
 	// 如果是文件夹且depth不为0，添加子项
 	if fileInfo.IsFolder == 1 && depth != "0" && len(fileInfo.Children) > 0 {
 		for _, child := range fileInfo.Children {
-			// 构建子项的URL路径
-			childPath := path.Join(ctx.Request.URL.Path, url.PathEscape(child.Name))
-			if child.IsFolder == 1 {
-				childPath += "/"
-			}
+			childPath := s.buildChildPath(currentPath, child.Name, child.IsFolder == 1)
 			s.addPropResponse(&xmlResponse, child, childPath)
 		}
 	}
@@ -120,7 +121,11 @@ func (s *service) generatePropfindResponse(ctx *gin.Context, fileInfo *FileInfo)
 // addPropResponse 添加单个文件/文件夹的属性响应
 func (s *service) addPropResponse(xmlResponse *strings.Builder, fileInfo *FileInfo, href string) {
 	xmlResponse.WriteString(`<D:response>`)
-	xmlResponse.WriteString(fmt.Sprintf(`<D:href>%s</D:href>`, escapeXML(href)))
+
+	// 正确编码 href
+	encodedHref := s.encodeWebDAVPath(href)
+	xmlResponse.WriteString(fmt.Sprintf(`<D:href>%s</D:href>`, escapeXML(encodedHref)))
+
 	xmlResponse.WriteString(`<D:propstat>`)
 	xmlResponse.WriteString(`<D:prop>`)
 
@@ -174,6 +179,62 @@ func (s *service) addPropResponse(xmlResponse *strings.Builder, fileInfo *FileIn
 	xmlResponse.WriteString(`<D:status>HTTP/1.1 200 OK</D:status>`)
 	xmlResponse.WriteString(`</D:propstat>`)
 	xmlResponse.WriteString(`</D:response>`)
+}
+
+// encodeWebDAVPath 对 WebDAV 路径进行正确的 URL 编码
+func (s *service) encodeWebDAVPath(rawPath string) string {
+	// 分割路径为各个部分
+	parts := strings.Split(strings.Trim(rawPath, "/"), "/")
+
+	// 对每个部分进行 URL 编码
+	encodedParts := make([]string, len(parts))
+	for i, part := range parts {
+		if part != "" {
+			encodedParts[i] = url.PathEscape(part)
+		}
+	}
+
+	// 重新组合路径
+	encodedPath := "/" + strings.Join(encodedParts, "/")
+
+	// 如果原路径以 / 结尾（文件夹），保持这个特征
+	if strings.HasSuffix(rawPath, "/") && !strings.HasSuffix(encodedPath, "/") {
+		encodedPath += "/"
+	}
+
+	return encodedPath
+}
+
+// normalizeWebDAVPath 标准化 WebDAV 路径
+func (s *service) normalizeWebDAVPath(rawPath string) string {
+	// 清理路径
+	cleanPath := path.Clean(rawPath)
+
+	// 确保以 / 开头
+	if !strings.HasPrefix(cleanPath, "/") {
+		cleanPath = "/" + cleanPath
+	}
+
+	return cleanPath
+}
+
+// buildChildPath 构建子项路径
+func (s *service) buildChildPath(parentPath, childName string, isFolder bool) string {
+	// 标准化父路径
+	parentPath = s.normalizeWebDAVPath(parentPath)
+
+	// 移除末尾的 /
+	parentPath = strings.TrimSuffix(parentPath, "/")
+
+	// 构建子路径
+	childPath := parentPath + "/" + childName
+
+	// 如果是文件夹，添加末尾的 /
+	if isFolder {
+		childPath += "/"
+	}
+
+	return childPath
 }
 
 // getContentType 根据文件扩展名获取MIME类型

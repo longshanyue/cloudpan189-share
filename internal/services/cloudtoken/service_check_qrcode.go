@@ -2,10 +2,11 @@ package cloudtoken
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/xxcheng123/cloudpan189-interface/client"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
-	"net/http"
 )
 
 type checkQrcodeRequest struct {

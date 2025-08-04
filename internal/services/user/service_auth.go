@@ -2,13 +2,14 @@ package user
 
 import (
 	"errors"
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"net/http"
-	"strings"
 )
 
 func (s *service) AuthMiddleware(permission uint8) gin.HandlerFunc {
