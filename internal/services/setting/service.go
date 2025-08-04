@@ -21,6 +21,7 @@ type Service interface {
 	ModifyBaseURL() gin.HandlerFunc
 	ToggleEnableTopFileAutoRefresh() gin.HandlerFunc
 	InitSystem() gin.HandlerFunc
+	ModifyJobThreadCount() gin.HandlerFunc
 }
 
 type service struct {

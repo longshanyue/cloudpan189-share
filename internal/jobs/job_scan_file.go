@@ -79,6 +79,8 @@ func (s *ScanFileJob) doJob(ctx context.Context) bool {
 
 		return false
 	case msg := <-shared.ScanJobRead():
+		_ = shared.RunningStat(msg.Msg.ID)
+		defer shared.FinishStat(msg.Msg.ID)
 		s.logger.Info("scan file job received message", zap.Any("msg", msg))
 		// 先检查文件还在不在
 		var count int64
@@ -91,15 +93,15 @@ func (s *ScanFileJob) doJob(ctx context.Context) bool {
 
 		switch msg.Type {
 		case shared.ScanJobTypeRefresh:
-			if err := s.handleFile(s.ctx, msg.Msg); err != nil {
+			if err := newScanWorker(s).start(ctx, msg.Msg, false); err != nil {
 				s.logger.Error("handle file error", zap.Error(err))
 			}
 		case shared.ScanJobTypeDeepRefresh:
-			if err := s.deepHandleFile(s.ctx, msg.Msg); err != nil {
+			if err := newScanWorker(s).start(ctx, msg.Msg, true); err != nil {
 				s.logger.Error("handle file error", zap.Error(err))
 			}
 		case shared.ScanJobTypeDel:
-			if err := s.recursiveDelete(s.ctx, []*models.VirtualFile{msg.Msg}); err != nil {
+			if err := s.recursiveDelete(ctx, []*models.VirtualFile{msg.Msg}); err != nil {
 				s.logger.Error("delete file error", zap.Error(err))
 			}
 		}
@@ -134,9 +136,11 @@ func (s *ScanFileJob) scanTop(ctx context.Context) error {
 	var errs = make([]error, 0)
 
 	for _, f := range topFiles {
-		if err := s.handleFile(ctx, f); err != nil {
+		_ = shared.RunningStat(f.ID)
+		if err := newScanWorker(s).start(ctx, f, false); err != nil {
 			errs = append(errs, err)
 		}
+		shared.FinishStat(f.ID)
 	}
 
 	if len(errs) > 0 {
@@ -146,27 +150,58 @@ func (s *ScanFileJob) scanTop(ctx context.Context) error {
 	return nil
 }
 
-func (s *ScanFileJob) handleFile(ctx context.Context, f *models.VirtualFile) error {
-	var scannedFiles = make([]*models.VirtualFile, 0)
-	var err error
+func newScanWorker(job *ScanFileJob) *scanWorker {
+	return &scanWorker{
+		job:    job,
+		logger: job.logger,
+		db:     job.db,
+		thread: shared.Setting.JobThreadCount,
+	}
+}
+
+type scanWorker struct {
+	job    *ScanFileJob
+	logger *zap.Logger
+	db     *gorm.DB
+	id     int64
+	// 多线程
+	thread int
+}
+
+func (w *scanWorker) start(ctx context.Context, f *models.VirtualFile, deep bool) (err error) {
+	w.id = f.ID
+
+	return w.execute(ctx, f, deep)
+}
+
+func (w *scanWorker) execute(ctx context.Context, f *models.VirtualFile, deep bool) (err error) {
+	var (
+		scannedFiles = make([]*models.VirtualFile, 0)
+	)
 
 	switch f.OsType {
 	case models.OsTypeSubscribe:
-		scannedFiles, err = s.getSubscribeUserFiles(ctx, f)
+		scannedFiles, err = w.job.getSubscribeUserFiles(ctx, f)
 	case models.OsTypeSubscribeShare:
-		scannedFiles, err = s.getSubscribeShareFiles(ctx, f)
+		scannedFiles, err = w.job.getSubscribeShareFiles(ctx, f)
 	case models.OsTypeShare:
-		scannedFiles, err = s.getShareFiles(ctx, f)
+		scannedFiles, err = w.job.getShareFiles(ctx, f)
 	default:
 		return errors.New("unsupported os type")
 	}
 
+	_ = shared.UpdateJobProgress(w.id, 0, int64(len(scannedFiles)))
+	defer func() {
+		_ = shared.UpdateJobProgress(w.id, int64(len(scannedFiles)), 0)
+	}()
+
 	if err != nil {
-		return fmt.Errorf("failed to scan files for %s: %w", f.Name, err)
+		return fmt.Errorf("failed to scan files for %s(%d): %w", f.Name, f.ID, err)
 	}
 
+	// 数据缓存文件
 	var dbFiles = make([]*models.VirtualFile, 0)
-	if err = s.db.WithContext(ctx).Where("parent_id = ?", f.ID).Find(&dbFiles).Error; err != nil {
+	if err = w.db.WithContext(ctx).Where("parent_id = ?", f.ID).Find(&dbFiles).Error; err != nil {
 		return fmt.Errorf("failed to query db files: %w", err)
 	}
 
@@ -195,18 +230,25 @@ func (s *ScanFileJob) handleFile(ctx context.Context, f *models.VirtualFile) err
 		if dbFile, exists := dbFileMap[name]; exists {
 			// 文件存在，检查是否需要更新（通过Rev比较）
 			if dbFile.Rev != scannedFile.Rev {
-				s.logger.Debug("file needs update - rev changed",
+				w.logger.Debug("file needs update - rev changed",
 					zap.String("parent", f.Name),
 					zap.String("file_name", name),
 					zap.String("old_rev", dbFile.Rev),
 					zap.String("new_rev", scannedFile.Rev))
 				// Rev不同，需要更新
-				scannedFile.ID = dbFile.ID // 保持原有ID
-				scannedFile.ParentId = f.ID
-				filesToUpdate = append(filesToUpdate, scannedFile)
+				dbFile.Name = scannedFile.Name
+				dbFile.Rev = scannedFile.Rev
+				dbFile.Size = scannedFile.Size
+				dbFile.Hash = strings.ToLower(scannedFile.Hash)
+				dbFile.CreateDate = scannedFile.CreateDate
+				dbFile.ModifyDate = scannedFile.ModifyDate
+				dbFile.UpdatedAt = time.Now()
+				filesToUpdate = append(filesToUpdate, dbFile)
+			} else if deep {
+				filesToUpdate = append(filesToUpdate, dbFile)
 			}
 		} else {
-			s.logger.Debug("new file found - not in database",
+			w.logger.Debug("new file found - not in database",
 				zap.String("parent", f.Name),
 				zap.String("file_name", name),
 				zap.String("rev", scannedFile.Rev))
@@ -218,8 +260,8 @@ func (s *ScanFileJob) handleFile(ctx context.Context, f *models.VirtualFile) err
 
 	// 遍历数据库中的文件，找出需要删除的文件
 	for name, dbFile := range dbFileMap {
-		if _, exists := scannedFileMap[name]; !exists {
-			s.logger.Debug("file to be deleted - not in remote",
+		if _, exists := scannedFileMap[name]; !exists && dbFile.IsTop != 1 {
+			w.logger.Debug("file to be deleted - not in remote",
 				zap.String("parent", f.Name),
 				zap.String("file_name", name),
 				zap.Int64("file_id", dbFile.ID),
@@ -233,32 +275,130 @@ func (s *ScanFileJob) handleFile(ctx context.Context, f *models.VirtualFile) err
 
 	// 批量处理新增文件
 	if len(filesToCreate) > 0 {
-		if err = s.db.WithContext(ctx).CreateInBatches(filesToCreate, 100).Error; err != nil {
+		if err = w.db.WithContext(ctx).CreateInBatches(filesToCreate, 100).Error; err != nil {
 			errs = append(errs, fmt.Errorf("failed to create files: %w", err))
 		}
 	}
 
 	// 批量处理更新文件
 	for _, file := range filesToUpdate {
-		if err = s.db.WithContext(ctx).Save(file).Error; err != nil {
+		if err = w.db.WithContext(ctx).Save(file).Error; err != nil {
 			errs = append(errs, fmt.Errorf("failed to update file %s: %w", file.Name, err))
 		}
 	}
 
 	// 递归删除文件（包括子文件和子文件夹）
 	if len(filesToDelete) > 0 {
-		if err = s.recursiveDelete(ctx, filesToDelete); err != nil {
+		if err = w.job.recursiveDelete(ctx, filesToDelete); err != nil {
 			errs = append(errs, fmt.Errorf("failed to delete files: %w", err))
 		}
 	}
 
 	// 递归处理子文件夹
 	allFiles := append(filesToCreate, filesToUpdate...)
+	folders := make([]*models.VirtualFile, 0)
 	for _, file := range allFiles {
 		if file.IsFolder == 1 { // 如果是文件夹
-			if err = s.handleFile(ctx, file); err != nil {
-				errs = append(errs, fmt.Errorf("failed to handle subfolder %s: %w", file.Name, err))
+			folders = append(folders, file)
+		}
+	}
+
+	if len(folders) > 0 {
+		if err = w.processSubfoldersParallel(ctx, folders, deep); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	return nil
+}
+
+// processSubfoldersParallel 并行处理子文件夹
+func (w *scanWorker) processSubfoldersParallel(ctx context.Context, folders []*models.VirtualFile, deep bool) error {
+	if len(folders) == 0 {
+		return nil
+	}
+
+	// 限制并发数量，避免创建过多goroutine
+	maxWorkers := w.thread
+	if maxWorkers <= 0 {
+		maxWorkers = 3 // 默认3个并发
+	}
+
+	// 如果文件夹数量少于线程数，使用文件夹数量
+	if len(folders) < maxWorkers {
+		maxWorkers = len(folders)
+	}
+
+	// 创建工作池
+	folderChan := make(chan *models.VirtualFile, len(folders))
+	errorChan := make(chan error, len(folders))
+
+	var wg sync.WaitGroup
+
+	// 启动worker goroutines
+	for i := 0; i < maxWorkers; i++ {
+		wg.Add(1)
+
+		workerID := i
+		gopool.Go(func() {
+			defer wg.Done()
+			w.logger.Debug("subfolder worker started", zap.Int("worker_id", workerID))
+
+			for folder := range folderChan {
+				select {
+				case <-ctx.Done():
+					errorChan <- ctx.Err()
+
+					return
+				default:
+					w.logger.Debug("processing subfolder",
+						zap.Int("worker_id", workerID),
+						zap.String("folder_name", folder.Name),
+						zap.Int64("folder_id", folder.ID))
+
+					if err := w.execute(ctx, folder, deep); err != nil {
+						w.logger.Error("failed to process subfolder",
+							zap.Int("worker_id", workerID),
+							zap.String("folder_name", folder.Name),
+							zap.Error(err))
+						errorChan <- fmt.Errorf("failed to handle subfolder %s: %w", folder.Name, err)
+					} else {
+						w.logger.Debug("subfolder processed successfully",
+							zap.Int("worker_id", workerID),
+							zap.String("folder_name", folder.Name))
+					}
+				}
 			}
+		})
+	}
+
+	// 发送任务到channel
+	go func() {
+		defer close(folderChan)
+		for _, folder := range folders {
+			select {
+			case <-ctx.Done():
+				return
+			case folderChan <- folder:
+			}
+		}
+	}()
+
+	// 等待所有worker完成
+	go func() {
+		wg.Wait()
+		close(errorChan)
+	}()
+
+	// 收集错误
+	var errs []error
+	for err := range errorChan {
+		if err != nil {
+			errs = append(errs, err)
 		}
 	}
 
@@ -304,43 +444,6 @@ func (s *ScanFileJob) recursiveDelete(ctx context.Context, files []*models.Virtu
 
 	// 删除当前层级的所有文件
 	if err := s.db.WithContext(ctx).Where("id IN ?", fileIDs).Delete(&models.VirtualFile{}).Error; err != nil {
-		errs = append(errs, fmt.Errorf("failed to delete files: %w", err))
-	}
-
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-
-	return nil
-}
-
-// recursiveDeleteSimple 简化版递归删除
-func (s *ScanFileJob) recursiveDeleteSimple(ctx context.Context, parentIDs []int64) error {
-	if len(parentIDs) == 0 {
-		return nil
-	}
-
-	var errs = make([]error, 0)
-
-	// 查找所有子文件
-	var childFiles []*models.VirtualFile
-	if err := s.db.WithContext(ctx).Where("parent_id IN ?", parentIDs).Find(&childFiles).Error; err != nil {
-		errs = append(errs, fmt.Errorf("failed to find child files: %w", err))
-	} else {
-		// 如果有子文件，先递归删除
-		if len(childFiles) > 0 {
-			var childIDs []int64
-			for _, child := range childFiles {
-				childIDs = append(childIDs, child.ID)
-			}
-			if err := s.recursiveDeleteSimple(ctx, childIDs); err != nil {
-				errs = append(errs, err)
-			}
-		}
-	}
-
-	// 删除当前层级的文件
-	if err := s.db.WithContext(ctx).Where("id IN ?", parentIDs).Delete(&models.VirtualFile{}).Error; err != nil {
 		errs = append(errs, fmt.Errorf("failed to delete files: %w", err))
 	}
 
@@ -794,216 +897,4 @@ func (s *ScanFileJob) getShareFiles(ctx context.Context, f *models.VirtualFile) 
 	}
 
 	return files, nil
-}
-
-// deepHandleFile 深度处理文件，强制刷新所有文件夹
-func (s *ScanFileJob) deepHandleFile(ctx context.Context, f *models.VirtualFile) error {
-	var scannedFiles = make([]*models.VirtualFile, 0)
-	var err error
-
-	switch f.OsType {
-	case models.OsTypeSubscribe:
-		scannedFiles, err = s.getSubscribeUserFiles(ctx, f)
-	case models.OsTypeSubscribeShare:
-		scannedFiles, err = s.getSubscribeShareFiles(ctx, f)
-	case models.OsTypeShare:
-		scannedFiles, err = s.getShareFiles(ctx, f)
-	default:
-		return errors.New("unsupported os type")
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to scan files for %s: %w", f.Name, err)
-	}
-
-	var dbFiles = make([]*models.VirtualFile, 0)
-	if err = s.db.WithContext(ctx).Where("parent_id = ?", f.ID).Find(&dbFiles).Error; err != nil {
-		return fmt.Errorf("failed to query db files: %w", err)
-	}
-
-	// 创建映射表，用于快速查找
-	scannedFileMap := make(map[string]*models.VirtualFile)
-	for _, file := range scannedFiles {
-		key := file.Name
-		scannedFileMap[key] = file
-	}
-
-	dbFileMap := make(map[string]*models.VirtualFile)
-	for _, file := range dbFiles {
-		key := file.Name
-		dbFileMap[key] = file
-	}
-
-	// 找出需要新增的文件
-	var filesToCreate []*models.VirtualFile
-	// 找出需要更新的文件
-	var filesToUpdate []*models.VirtualFile
-	// 找出需要删除的文件
-	var filesToDelete []*models.VirtualFile
-	// 需要递归处理的文件夹
-	var foldersToProcess []*models.VirtualFile
-
-	// 遍历扫描到的文件，找出新增和更新的文件
-	for name, scannedFile := range scannedFileMap {
-		if dbFile, exists := dbFileMap[name]; exists {
-			// 文件存在，检查是否需要更新
-			needUpdate := false
-
-			if dbFile.Rev != scannedFile.Rev {
-				s.logger.Debug("file needs update - rev changed",
-					zap.String("parent", f.Name),
-					zap.String("file_name", name),
-					zap.String("old_rev", dbFile.Rev),
-					zap.String("new_rev", scannedFile.Rev))
-				needUpdate = true
-			} else if s.needUpdateFile(dbFile, scannedFile) {
-				// 即使rev相同也检查其他字段是否需要更新
-				s.logger.Debug("file needs update - other fields changed",
-					zap.String("parent", f.Name),
-					zap.String("file_name", name),
-					zap.String("rev", scannedFile.Rev))
-				needUpdate = true
-			}
-
-			if needUpdate {
-				// 需要更新
-				scannedFile.ID = dbFile.ID // 保持原有ID
-				scannedFile.ParentId = f.ID
-				filesToUpdate = append(filesToUpdate, scannedFile)
-
-				// 如果是文件夹，添加到递归处理列表
-				if scannedFile.IsFolder == 1 {
-					foldersToProcess = append(foldersToProcess, scannedFile)
-				}
-			} else {
-				// 不需要更新，但如果是文件夹仍需要递归处理（这是关键区别）
-				if dbFile.IsFolder == 1 {
-					s.logger.Debug("folder unchanged but will still scan children",
-						zap.String("parent", f.Name),
-						zap.String("folder_name", name),
-						zap.String("rev", dbFile.Rev))
-					foldersToProcess = append(foldersToProcess, dbFile)
-				}
-			}
-		} else {
-			s.logger.Debug("new file found - not in database",
-				zap.String("parent", f.Name),
-				zap.String("file_name", name),
-				zap.String("rev", scannedFile.Rev))
-			// 文件不存在，需要新增
-			scannedFile.ParentId = f.ID
-			filesToCreate = append(filesToCreate, scannedFile)
-
-			// 如果是新增的文件夹，也需要递归处理
-			if scannedFile.IsFolder == 1 {
-				foldersToProcess = append(foldersToProcess, scannedFile)
-			}
-		}
-	}
-
-	// 遍历数据库中的文件，找出需要删除的文件
-	for name, dbFile := range dbFileMap {
-		if _, exists := scannedFileMap[name]; !exists {
-			s.logger.Debug("file to be deleted - not in remote",
-				zap.String("parent", f.Name),
-				zap.String("file_name", name),
-				zap.Int64("file_id", dbFile.ID),
-				zap.String("rev", dbFile.Rev))
-			// 扫描结果中不存在该文件，需要删除
-			filesToDelete = append(filesToDelete, dbFile)
-		}
-	}
-
-	var errs = make([]error, 0)
-
-	// 批量处理新增文件
-	if len(filesToCreate) > 0 {
-		if err = s.db.WithContext(ctx).CreateInBatches(filesToCreate, 100).Error; err != nil {
-			errs = append(errs, fmt.Errorf("failed to create files: %w", err))
-		}
-	}
-
-	// 批量处理更新文件
-	for _, file := range filesToUpdate {
-		if err = s.db.WithContext(ctx).Save(file).Error; err != nil {
-			errs = append(errs, fmt.Errorf("failed to update file %s: %w", file.Name, err))
-		}
-	}
-
-	// 递归删除文件（包括子文件和子文件夹）
-	if len(filesToDelete) > 0 {
-		if err = s.recursiveDelete(ctx, filesToDelete); err != nil {
-			errs = append(errs, fmt.Errorf("failed to delete files: %w", err))
-		}
-	}
-
-	// 递归处理子文件夹（关键：总是处理所有文件夹）
-	for _, folder := range foldersToProcess {
-		if err = s.deepHandleFile(ctx, folder); err != nil {
-			errs = append(errs, fmt.Errorf("failed to handle subfolder %s: %w", folder.Name, err))
-		}
-	}
-
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-
-	return nil
-}
-
-// needUpdateFile 检查文件是否需要更新（除了rev之外的其他字段）
-func (s *ScanFileJob) needUpdateFile(dbFile, scannedFile *models.VirtualFile) bool {
-	// 检查文件大小
-	if dbFile.Size != scannedFile.Size {
-		return true
-	}
-
-	// 检查哈希值
-	if dbFile.Hash != scannedFile.Hash {
-		return true
-	}
-
-	// 检查修改时间
-	if dbFile.ModifyDate != scannedFile.ModifyDate {
-		return true
-	}
-
-	// 检查创建时间
-	if dbFile.CreateDate != scannedFile.CreateDate {
-		return true
-	}
-
-	// 检查是否为文件夹的标识
-	if dbFile.IsFolder != scannedFile.IsFolder {
-		return true
-	}
-
-	// 可以根据需要添加更多字段的比较
-	// 比如检查 Addition 字段中的某些关键信息
-	if s.needUpdateAddition(dbFile.Addition, scannedFile.Addition) {
-		return true
-	}
-
-	return false
-}
-
-// needUpdateAddition 检查Addition字段是否需要更新
-func (s *ScanFileJob) needUpdateAddition(dbAddition, scannedAddition map[string]any) bool {
-	// 检查关键字段
-	keyFields := []string{"share_id", "file_id"}
-
-	for _, key := range keyFields {
-		dbValue, dbExists := dbAddition[key]
-		scannedValue, scannedExists := scannedAddition[key]
-
-		if dbExists != scannedExists {
-			return true
-		}
-
-		if dbExists && dbValue != scannedValue {
-			return true
-		}
-	}
-
-	return false
 }

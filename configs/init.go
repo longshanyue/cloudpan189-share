@@ -79,7 +79,6 @@ func Init() {
 		new(models.User),
 		new(models.Setting),
 		new(models.CloudToken),
-		new(models.StorageEntry),
 		new(models.VirtualFile),
 	); err != nil {
 		panic(err)

@@ -91,7 +91,14 @@ func (s *service) Delete() gin.HandlerFunc {
 
 		file = scanFile
 
-		_ = shared.ScanJobPublish(shared.ScanJobTypeDel, &file)
+		if err := shared.ScanJobPublish(shared.ScanJobTypeDel, &file); err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"code":    http.StatusInternalServerError,
+				"message": err.Error(),
+			})
+
+			return
+		}
 
 		ctx.JSON(http.StatusOK, gin.H{
 			"code":    http.StatusOK,

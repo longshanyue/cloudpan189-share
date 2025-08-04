@@ -69,6 +69,8 @@ func StartHTTPServer() error {
 		settingRouter.POST("/toggle_multiple_stream", settingService.ToggleMultipleStream())
 		settingRouter.POST("/modify_base_url", settingService.ModifyBaseURL())
 		settingRouter.POST("/toggle_enable_top_file_auto_refresh", settingService.ToggleEnableTopFileAutoRefresh())
+		settingRouter.POST("/modify_job_thread_count", settingService.ModifyJobThreadCount())
+
 		openapiRouter.POST("/setting/init_system", settingService.InitSystem())
 	}
 
@@ -88,6 +90,7 @@ func StartHTTPServer() error {
 		davMethods := []string{"GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PROPFIND", "MKCOL", "MOVE", "LOCK", "UNLOCK"}
 		for _, method := range davMethods {
 			engine.Handle(method, "/dav/*path", userService.BasicAuthMiddleware(models.PermissionDavRead), universalFsService.DavMiddleware(), universalFsService.Open("/dav", "dav"))
+			engine.Handle(method, "/dav", userService.BasicAuthMiddleware(models.PermissionDavRead), universalFsService.DavMiddleware(), universalFsService.Open("/dav", "dav"))
 		}
 		openapiRouter.GET("/file_download", universalFsService.FileDownload())
 	}
