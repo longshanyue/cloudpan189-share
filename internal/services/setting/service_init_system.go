@@ -3,11 +3,12 @@ package setting
 import (
 	"crypto/md5"
 	"fmt"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"go.uber.org/zap"
-	"net/http"
 )
 
 type initSystemRequest struct {

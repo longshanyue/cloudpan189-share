@@ -4,6 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/xxcheng123/cloudpan189-interface/client"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
@@ -11,10 +16,6 @@ import (
 	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"runtime/debug"
-	"strings"
-	"sync"
-	"time"
 )
 
 type ScanFileJob struct {

@@ -3,6 +3,12 @@ package universalfs
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"github.com/xxcheng123/cloudpan189-interface/client"
@@ -12,11 +18,6 @@ import (
 	"github.com/xxcheng123/multistreamer"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"io"
-	"net/http"
-	"net/url"
-	"strconv"
-	"time"
 )
 
 type fileDownloadRequest struct {

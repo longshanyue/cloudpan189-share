@@ -3,12 +3,13 @@ package user
 import (
 	"crypto/md5"
 	"fmt"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"time"
 )
 
 type Service interface {

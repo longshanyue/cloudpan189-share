@@ -1,10 +1,11 @@
 package user
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"go.uber.org/zap"
-	"net/http"
 )
 
 type modifyPassRequest struct {
@@ -55,7 +56,7 @@ func (s *service) ModifyPass() gin.HandlerFunc {
 				"code": http.StatusNotFound,
 				"msg":  "用户不存在",
 			})
-			
+
 			return
 		}
 

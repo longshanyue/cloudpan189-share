@@ -1,9 +1,10 @@
 package cloudtoken
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/xxcheng123/cloudpan189-interface/client"
-	"net/http"
 )
 
 type initQrcodeResponse struct {

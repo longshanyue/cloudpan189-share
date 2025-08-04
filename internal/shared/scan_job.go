@@ -1,9 +1,10 @@
 package shared
 
 import (
+	"sync"
+
 	"github.com/pkg/errors"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
-	"sync"
 )
 
 type scanJob struct {

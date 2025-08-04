@@ -1,11 +1,11 @@
 package setting
 
-import "github.com/gin-gonic/gin"
-
 import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/shared"
-	"net/http"
 )
 
 type toggleEnableTopFileAutoRefreshRequest struct {

@@ -2,11 +2,12 @@ package user
 
 import (
 	"errors"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"net/http"
 )
 
 // 登录请求结构

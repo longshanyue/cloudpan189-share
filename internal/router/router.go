@@ -2,6 +2,10 @@ package router
 
 import (
 	"fmt"
+	"io/fs"
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	embed "github.com/xxcheng123/cloudpan189-share"
 	"github.com/xxcheng123/cloudpan189-share/configs"
@@ -12,9 +16,6 @@ import (
 	"github.com/xxcheng123/cloudpan189-share/internal/services/universalfs"
 	"github.com/xxcheng123/cloudpan189-share/internal/services/user"
 	"go.uber.org/zap"
-	"io/fs"
-	"net/http"
-	"strings"
 )
 
 func StartHTTPServer() error {
