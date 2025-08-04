@@ -148,6 +148,35 @@
             </div>
           </div>
         </div>
+
+        <div class="setting-item">
+          <div class="setting-label">
+            <span class="label-text">任务线程数</span>
+            <span class="label-desc">当添加挂载文件或刷新扫描文件时，最大的并发线程数，为了保证服务可靠性，目前最大值为8（任务执行还是单任务按序执行，只是对某个任务的执行速度加快了）</span>
+          </div>
+          <div class="setting-control">
+            <div class="thread-count-control">
+              <input 
+                v-model.number="jobThreadCount"
+                type="range" 
+                min="1" 
+                max="8" 
+                step="1"
+                class="thread-slider"
+                :disabled="loading"
+                @input="handleThreadCountChange"
+              >
+              <span class="thread-count-value">{{ jobThreadCount }}</span>
+            </div>
+            <button 
+              @click="handleModifyJobThreadCount" 
+              class="btn btn-primary btn-sm"
+              :disabled="loading || jobThreadCount === originalJobThreadCount"
+            >
+              {{ loading ? '保存中...' : '保存' }}
+            </button>
+          </div>
+        </div>
         
         <div class="setting-item">
           <div class="setting-label">
@@ -188,6 +217,8 @@ const websiteName = ref('')
 const originalWebsiteName = ref('') // 用于存储原始网站名称
 const baseURL = ref('')
 const originalBaseURL = ref('') // 用于存储原始基础URL
+const jobThreadCount = ref(1)
+const originalJobThreadCount = ref(1) // 用于存储原始任务线程数
 
 // 定时器引用
 const timer = ref<NodeJS.Timeout | null>(null)
@@ -242,6 +273,8 @@ const fetchSettingData = async () => {
       originalWebsiteName.value = data.title
       baseURL.value = data.baseURL
       originalBaseURL.value = data.baseURL
+      jobThreadCount.value = data.jobThreadCount || 1
+      originalJobThreadCount.value = data.jobThreadCount || 1
     }
   } catch (error) {
     toast.error('获取设置失败')
@@ -422,6 +455,31 @@ const handleModifyBaseURL = async () => {
 const handleAutoFillBaseURL = () => {
   baseURL.value = window.location.origin
   toast.info('已自动获取当前URL')
+}
+
+// 处理任务线程数变化
+const handleThreadCountChange = () => {
+  // 实时更新显示值，但不保存
+}
+
+// 修改任务线程数
+const handleModifyJobThreadCount = async () => {
+  if (jobThreadCount.value < 1 || jobThreadCount.value > 8) {
+    toast.warning('任务线程数必须在1-8之间')
+    return
+  }
+  
+  try {
+    loading.value = true
+    await settingStore.modifyJobThreadCount(jobThreadCount.value)
+    originalJobThreadCount.value = jobThreadCount.value
+    toast.success('任务线程数修改成功')
+  } catch (error) {
+    console.error('修改任务线程数失败:', error)
+    toast.error('修改任务线程数失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 组件挂载时获取设置并启动定时器
@@ -612,6 +670,75 @@ onUnmounted(() => {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
+/* 任务线程数控件样式 */
+.thread-count-control {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 200px;
+}
+
+.thread-slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: #e5e7eb;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.thread-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s;
+}
+
+.thread-slider::-webkit-slider-thumb:hover {
+  background: #2563eb;
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.thread-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s;
+}
+
+.thread-slider::-moz-range-thumb:hover {
+  background: #2563eb;
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.thread-slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.thread-count-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  min-width: 20px;
+  text-align: center;
+  padding: 0.25rem 0.5rem;
+  background: #f3f4f6;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .setting-item {
@@ -629,6 +756,11 @@ onUnmounted(() => {
   .setting-input {
     min-width: auto;
     flex: 1;
+    width: 100%;
+  }
+  
+  .thread-count-control {
+    min-width: auto;
     width: 100%;
   }
 }

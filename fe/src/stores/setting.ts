@@ -1,3 +1,4 @@
+// stores/setting.ts
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { settingApi, type Setting, type InitSystemRequest } from '@/api/setting'
@@ -110,6 +111,19 @@ export const useSettingStore = defineStore('setting', () => {
     }
   }
 
+  // 修改任务线程数
+  const modifyJobThreadCount = async (threadCount: number) => {
+    try {
+      await settingApi.modifyJobThreadCount({ threadCount })
+      if (setting.value) {
+        setting.value.jobThreadCount = threadCount
+      }
+    } catch (error) {
+      console.error('修改任务线程数失败:', error)
+      throw error
+    }
+  }
+
   // 初始化系统
   const initSystem = async (data: InitSystemRequest) => {
     try {
@@ -133,6 +147,7 @@ export const useSettingStore = defineStore('setting', () => {
     toggleLocalProxy,
     toggleMultipleStream,
     toggleEnableTopFileAutoRefresh,
+    modifyJobThreadCount,
     initSystem
   }
 })

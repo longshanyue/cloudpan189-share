@@ -1,3 +1,4 @@
+// api/setting.ts
 import api from './index'
 
 // 设置相关接口类型定义
@@ -13,6 +14,7 @@ export interface Setting {
   baseURL: string
   enableTopFileAutoRefresh: boolean
   initialized: boolean // 系统是否初始化完成
+  jobThreadCount: number // 任务线程数
 }
 
 export interface InitSystemRequest {
@@ -45,6 +47,10 @@ export interface ToggleEnableTopFileAutoRefreshRequest {
 
 export interface ModifyBaseURLRequest {
   baseURL: string
+}
+
+export interface ModifyJobThreadCountRequest {
+  threadCount: number
 }
 
 // 设置API
@@ -87,6 +93,11 @@ export const settingApi = {
   // 切换挂载文件自动刷新状态
   toggleEnableTopFileAutoRefresh: (data: ToggleEnableTopFileAutoRefreshRequest): Promise<void> => {
     return api.post('/setting/toggle_enable_top_file_auto_refresh', data)
+  },
+
+  // 修改任务线程数
+  modifyJobThreadCount: (data: ModifyJobThreadCountRequest): Promise<void> => {
+    return api.post('/setting/modify_job_thread_count', data)
   },
 
   // 初始化系统

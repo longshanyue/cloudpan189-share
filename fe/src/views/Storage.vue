@@ -3,103 +3,114 @@
     <!-- 存储管理主卡片 -->
     <PageCard title="存储管理" subtitle="管理存储挂载点和令牌绑定">
       <SectionDivider />
-      
+
       <SubsectionTitle title="存储列表" />
-        <!-- 操作栏 -->
-        <div class="action-bar">
-          <div class="search-section">
-            <input 
-              v-model="searchName" 
-              type="text" 
-              placeholder="搜索存储名称..." 
-              class="search-input"
-              @input="handleSearch"
-            >
-          </div>
+      <!-- 操作栏 -->
+      <div class="action-bar">
+        <div class="search-section">
+          <input v-model="searchName" type="text" placeholder="搜索存储名称..." class="search-input" @input="handleSearch">
+        </div>
+        <div class="action-buttons-group">
+          <button @click="fetchStorages" class="btn btn-secondary" :disabled="loading">
+            <Icons name="refresh" size="1rem" class="btn-icon" />
+            {{ loading ? '刷新中...' : '刷新' }}
+          </button>
           <button @click="showAddModal = true" class="btn btn-primary">
             <Icons name="add" size="1rem" class="btn-icon" />
             添加存储
           </button>
         </div>
+      </div>
 
-        <!-- 存储列表 -->
-        <div class="storage-table-container">
-          <div v-if="loading" class="loading-state">
-            <div class="loading-spinner"></div>
-            <p>加载中...</p>
-          </div>
-          
-          <div v-else-if="storages.length === 0" class="empty-state">
-            <Icons name="storage" size="3rem" class="empty-icon" />
-            <h3>暂无存储</h3>
-            <p>{{ searchName ? '没有找到匹配的存储' : '还没有存储，点击上方按钮添加第一个存储' }}</p>
-          </div>
-          
-          <table v-else class="storage-table">
-            <thead>
-              <tr>
-                <th>序号</th>
-                <th>挂载路径</th>
-                <th>协议类型</th>
-                <th>令牌绑定</th>
-                <th>创建时间</th>
-                <th>修改时间</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(storage, index) in storages" :key="storage.id" class="storage-row">
-                <td>{{ (currentPage - 1) * pageSize + index + 1 }}</td>
-                <td>
-                  <div class="storage-info">
-                    <div class="storage-icon">
-                      <Icons name="storage" size="1.2rem" />
-                    </div>
-                    <div>
-                      <div class="storage-name">{{ storage.localPath }}</div>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <span class="protocol-badge" :class="`protocol-${storage.osType}`">
-                    {{ storage.osType === 'subscribe' ? '订阅' : '分享' }}
-                  </span>
-                </td>
-                <td>
-                  <div v-if="storage.addition?.cloud_token" class="token-info">
-                    <div class="token-name">令牌 #{{ storage.addition.cloud_token }}</div>
-                    <div class="token-expire" v-if="getTokenById(storage.addition.cloud_token)">
-                      {{ getTokenExpireText(getTokenById(storage.addition.cloud_token)) }}
-                    </div>
-                  </div>
-                  <span v-else class="no-token">未绑定</span>
-                </td>
-                <td>{{ formatDate(storage.createdAt) }}</td>
-                <td>{{ formatDate(storage.updatedAt) }}</td>
-                <td>
-                  <div class="action-buttons">
-                    <button @click="bindToken(storage)" class="btn btn-sm btn-secondary">
-                      {{ storage.addition.cloud_token ? '重绑令牌' : '绑定令牌' }}
-                    </button>
-                    <button @click="deleteStorage(storage)" class="btn btn-sm btn-danger">
-                      删除
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-            
-          <!-- 分页组件 -->
-          <Pagination 
-            v-if="total > 0"
-            :current-page="currentPage"
-            :page-size="pageSize"
-            :total="total"
-            @page-change="handlePageChange"
-            @page-size-change="handlePageSizeChange"
-          />
+      <!-- 存储列表 -->
+      <div class="storage-table-container">
+        <div v-if="loading" class="loading-state">
+          <div class="loading-spinner"></div>
+          <p>加载中...</p>
         </div>
+
+        <div v-else-if="storages.length === 0" class="empty-state">
+          <Icons name="storage" size="3rem" class="empty-icon" />
+          <h3>暂无存储</h3>
+          <p>{{ searchName ? '没有找到匹配的存储' : '还没有存储，点击上方按钮添加第一个存储' }}</p>
+        </div>
+
+        <table v-else class="storage-table">
+          <thead>
+            <tr>
+              <th style="text-align: center">序号</th>
+              <th style="text-align: center">挂载路径</th>
+              <th style="text-align: center">协议类型</th>
+              <th style="width: 260px; text-align: center">任务状态</th>
+              <th style="text-align: center">令牌绑定</th>
+              <th style="text-align: center">创建时间</th>
+              <th style="text-align: center">修改时间</th>
+              <th style="text-align: center">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(storage, index) in storages" :key="storage.id" class="storage-row">
+              <td>{{ (currentPage - 1) * pageSize + index + 1 }}</td>
+              <td>
+                <div class="storage-info">
+                  <div class="storage-icon">
+                    <Icons name="storage" size="1.2rem" />
+                  </div>
+                  <div>
+                    <div class="storage-name">{{ storage.localPath }}</div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="protocol-badge" :class="`protocol-${storage.osType}`">
+                  {{ storage.osType === 'subscribe' ? '订阅' : '分享' }}
+                </span>
+              </td>
+              <td>
+                <div v-if="storage.jobStatus" class="job-status">
+                  <div class="job-status-inline">
+                    <span class="status-badge"
+                      :class="storage.jobStatus.status === 0 ? 'status-waiting' : 'status-running'">
+                      {{ JobStatusMap[storage.jobStatus.jobType] }}：
+                      {{ storage.jobStatus.status === 0 ? '等待执行中' : '执行中' }}
+                      <span
+                        v-if="storage.jobStatus.status === 1 && (storage.jobStatus.jobType === 'refresh' || storage.jobStatus.jobType === 'deep_refresh')">
+                        ，进度: {{ storage.jobStatus.scannedCount || 0 }} / {{ storage.jobStatus.waitCount || 0 }}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+                <span v-else class="no-job">-</span>
+              </td>
+              <td>
+                <div v-if="storage.addition?.cloud_token" class="token-info">
+                  <div class="token-name">令牌 #{{ storage.addition.cloud_token }}</div>
+                  <div class="token-expire" v-if="getTokenById(storage.addition.cloud_token)">
+                    {{ getTokenExpireText(getTokenById(storage.addition.cloud_token)) }}
+                  </div>
+                </div>
+                <span v-else class="no-token">未绑定</span>
+              </td>
+              <td>{{ formatDate(storage.createdAt) }}</td>
+              <td>{{ formatDate(storage.updatedAt) }}</td>
+              <td>
+                <div class="action-buttons">
+                  <button @click="bindToken(storage)" class="btn btn-sm btn-secondary">
+                    {{ storage.addition.cloud_token ? '重绑令牌' : '绑定令牌' }}
+                  </button>
+                  <button @click="deleteStorage(storage)" class="btn btn-sm btn-danger">
+                    删除
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- 分页组件 -->
+        <Pagination v-if="total > 0" :current-page="currentPage" :page-size="pageSize" :total="total"
+          @page-change="handlePageChange" @page-size-change="handlePageSizeChange" />
+      </div>
     </PageCard>
 
     <!-- 添加存储弹窗 -->
@@ -117,20 +128,11 @@
                 必须 / 开头，但不能只输入 / ，比如 /音视频文件夹/视频文件夹
               </div>
             </label>
-            <input
-              v-model="newStorage.localPath" 
-              type="text" 
-              class="form-input" 
-              placeholder="请输入本地路径"
-            />
+            <input v-model="newStorage.localPath" type="text" class="form-input" placeholder="请输入本地路径" />
           </div>
           <div class="form-group">
             <label class="form-label">协议类型</label>
-            <Select 
-              v-model="newStorage.protocol" 
-              :options="protocolOptions" 
-              placeholder="请选择协议类型"
-            />
+            <Select v-model="newStorage.protocol" :options="protocolOptions" placeholder="请选择协议类型" />
           </div>
           <div class="form-group">
             <label class="form-label">
@@ -139,39 +141,20 @@
                 如果没有绑定令牌，资源无法在线观看或下载
               </div>
             </label>
-            <Select 
-              v-model="newStorage.cloudToken" 
-              :options="tokenOptions" 
-              placeholder="请选择令牌"
-            />
+            <Select v-model="newStorage.cloudToken" :options="tokenOptions" placeholder="请选择令牌" />
           </div>
           <div v-if="newStorage.protocol === 'subscribe'" class="form-group">
             <label class="form-label">订阅用户ID</label>
-            <input 
-              v-model="newStorage.subscribeUser" 
-              type="text" 
-              class="form-input" 
-              placeholder="请输入订阅用户ID"
-            />
+            <input v-model="newStorage.subscribeUser" type="text" class="form-input" placeholder="请输入订阅用户ID" />
           </div>
           <div v-if="newStorage.protocol === 'share'">
             <div class="form-group">
               <label class="form-label">分享码</label>
-              <input 
-                v-model="newStorage.shareCode" 
-                type="text" 
-                class="form-input" 
-                placeholder="请输入分享码"
-              />
+              <input v-model="newStorage.shareCode" type="text" class="form-input" placeholder="请输入分享码" />
             </div>
             <div class="form-group">
               <label class="form-label">访问码（可选）</label>
-              <input 
-                v-model="newStorage.shareAccessCode" 
-                type="text" 
-                class="form-input" 
-                placeholder="请输入访问码（可选）"
-              />
+              <input v-model="newStorage.shareAccessCode" type="text" class="form-input" placeholder="请输入访问码（可选）" />
             </div>
           </div>
         </div>
@@ -192,14 +175,11 @@
           <button @click="closeBindModal" class="close-btn">&times;</button>
         </div>
         <div class="modal-body">
-          <p class="bind-info">为存储 <strong>{{ bindingStorage?.name }}</strong> {{ bindingStorage?.addition.cloud_token ? '重新绑定' : '绑定' }}令牌</p>
+          <p class="bind-info">为存储 <strong>{{ bindingStorage?.name }}</strong> {{ bindingStorage?.addition.cloud_token ?
+            '重新绑定' : '绑定' }}令牌</p>
           <div class="form-group">
             <label class="form-label">选择令牌</label>
-            <Select 
-              v-model="selectedTokenId" 
-              :options="tokenOptions" 
-              placeholder="请选择令牌"
-            />
+            <Select v-model="selectedTokenId" :options="tokenOptions" placeholder="请选择令牌" />
           </div>
         </div>
         <div class="modal-footer">
@@ -222,6 +202,7 @@ import SubsectionTitle from '@/components/SubsectionTitle.vue'
 import { ref, onMounted, computed, reactive, onUnmounted } from 'vue'
 import { storageApi, type Storage, type AddStorageRequest } from '@/api/storage'
 import { cloudTokenApi, type CloudToken } from '@/api/cloudtoken'
+import { JobStatusMap, type JobStat } from '@/api/shared'
 import { toast } from '@/utils/toast'
 import { confirmDialog } from '@/utils/confirm'
 import Select from '@/components/Select.vue'
@@ -290,7 +271,7 @@ let refreshTimer: ReturnType<typeof setInterval>
 onMounted(() => {
   refreshTimer = setInterval(() => {
     fetchStorages()
-  }, 30*1000)
+  }, 30 * 1000)
 })
 
 onUnmounted(() => {
@@ -343,7 +324,7 @@ const confirmAddStorage = async () => {
     toast.warning('请输入本地路径')
     return
   }
-  
+
   if (newStorage.protocol === 'subscribe') {
     if (!newStorage.subscribeUser.trim()) {
       toast.warning('请输入订阅用户ID')
@@ -355,18 +336,18 @@ const confirmAddStorage = async () => {
       return
     }
   }
-  
+
   try {
     addLoading.value = true
     const requestData: AddStorageRequest = {
       localPath: newStorage.localPath.trim(),
       protocol: newStorage.protocol
     }
-    
+
     if (newStorage.cloudToken) {
       requestData.cloudToken = Number(newStorage.cloudToken)
     }
-    
+
     if (newStorage.protocol === 'subscribe') {
       requestData.subscribeUser = newStorage.subscribeUser.trim()
     } else if (newStorage.protocol === 'share') {
@@ -375,7 +356,7 @@ const confirmAddStorage = async () => {
         requestData.shareAccessCode = newStorage.shareAccessCode.trim()
       }
     }
-    
+
     await storageApi.add(requestData)
     toast.success('添加存储成功，后台异步执行，如未显示，稍后刷新重新查看')
     closeAddModal()
@@ -409,7 +390,7 @@ const confirmBindToken = async () => {
   if (!bindingStorage.value) {
     return
   }
-  
+
   try {
     bindLoading.value = true
     await storageApi.modifyToken({
@@ -430,24 +411,28 @@ const confirmBindToken = async () => {
 // 删除存储
 const deleteStorage = async (storage: Storage) => {
   const confirmed = await confirmDialog({
-     title: '删除存储',
-     message: `确定要删除存储 "${storage.name}" 吗？此操作不可恢复。`,
-     confirmText: '删除',
-     cancelText: '取消',
-     isDanger: true
-   })
-  
+    title: '删除存储',
+    message: `确定要删除存储 "${storage.name}" 吗？此操作不可恢复。`,
+    confirmText: '删除',
+    cancelText: '取消',
+    isDanger: true
+  })
+
   if (!confirmed) {
     return
   }
-  
+
   try {
     await storageApi.delete({ id: storage.id })
     toast.success('删除存储成功')
     fetchStorages()
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.message) {
+      toast.error(error.message)
+    } else {
+      toast.error('删除存储失败')
+    }
     console.error('删除存储失败:', error)
-    toast.error('删除存储失败')
   }
 }
 
@@ -472,19 +457,19 @@ const getTokenById = (tokenId: number) => {
 // 获取令牌到期时间文本
 const getTokenExpireText = (token: CloudToken | undefined): string => {
   if (!token) return ''
-  
+
   // expiresIn是13位时间戳，表示到期时间
   const expireTime = token.expiresIn
   const now = Date.now()
-  
+
   if (expireTime <= now) {
     return '已过期'
   }
-  
+
   const diffMs = expireTime - now
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
   const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-  
+
   if (diffDays > 0) {
     return `${diffDays}天后到期`
   } else if (diffHours > 0) {
@@ -511,7 +496,7 @@ onMounted(() => {
   if (savedPageSize) {
     pageSize.value = parseInt(savedPageSize)
   }
-  
+
   fetchStorages()
   fetchAvailableTokens()
 })
@@ -644,8 +629,13 @@ onMounted(() => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* 空状态 */
@@ -681,6 +671,7 @@ onMounted(() => {
 .storage-table {
   width: 100%;
   border-collapse: collapse;
+  text-align: center;
 }
 
 .storage-table th {
@@ -771,6 +762,230 @@ onMounted(() => {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.action-buttons-group {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.action-buttons-group .btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+}
+
+.action-buttons-group .btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.action-buttons-group .btn:hover::before {
+  left: 100%;
+}
+
+.action-buttons-group .btn-secondary {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: 1px solid #10b981;
+  box-shadow: 0 2px 4px 0 rgba(16, 185, 129, 0.2), 0 1px 2px 0 rgba(16, 185, 129, 0.1);
+}
+
+.action-buttons-group .btn-secondary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px 0 rgba(16, 185, 129, 0.3), 0 2px 4px 0 rgba(16, 185, 129, 0.2);
+}
+
+.action-buttons-group .btn-secondary:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+}
+
+.action-buttons-group .btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: 1px solid #3b82f6;
+  box-shadow: 0 2px 4px 0 rgba(59, 130, 246, 0.2), 0 1px 2px 0 rgba(59, 130, 246, 0.1);
+}
+
+.action-buttons-group .btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px 0 rgba(59, 130, 246, 0.3), 0 2px 4px 0 rgba(59, 130, 246, 0.2);
+}
+
+.action-buttons-group .btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px 0 rgba(59, 130, 246, 0.2);
+}
+
+.action-buttons-group .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+.action-buttons-group .btn-icon {
+  transition: transform 0.3s ease;
+}
+
+.action-buttons-group .btn:hover:not(:disabled) .btn-icon {
+  transform: scale(1.1);
+}
+
+/* 任务状态样式 */
+.job-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 160px;
+}
+
+.job-status-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.job-type {
+  display: flex;
+  align-items: center;
+}
+
+.job-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.375rem 0.875rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  border: 1px solid transparent;
+}
+
+.job-del {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.job-refresh {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+
+.job-deep_refresh {
+  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+  color: #7c3aed;
+  border-color: #e9d5ff;
+}
+
+.job-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  border: 1px solid transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+.status-waiting {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  color: #d97706;
+  border-color: #fed7aa;
+}
+
+.status-waiting::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #f59e0b;
+}
+
+.status-running {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  color: #16a34a;
+  border-color: #bbf7d0;
+  animation: pulse-green 2s infinite;
+}
+
+.status-running::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #22c55e;
+}
+
+@keyframes pulse-green {
+
+  0%,
+  100% {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05), 0 0 0 0 rgba(34, 197, 94, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05), 0 0 0 4px rgba(34, 197, 94, 0.2);
+  }
+}
+
+.progress-info {
+  margin-top: 0.375rem;
+  padding: 0.5rem;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.progress-text {
+  font-size: 0.75rem;
+  color: #475569;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.progress-text::before {
+  content: '📊';
+  font-size: 0.875rem;
+}
+
+.no-job {
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 0.875rem;
+  text-align: center;
+  padding: 1rem 0;
 }
 
 /* 弹窗样式 */
@@ -895,29 +1110,39 @@ onMounted(() => {
     gap: 1rem;
     align-items: stretch;
   }
-  
+
   .search-section {
     max-width: none;
   }
-  
+
+  .action-buttons-group {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .action-buttons-group .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
   .storage-table {
     font-size: 0.75rem;
   }
-  
+
   .storage-table th,
   .storage-table td {
     padding: 0.75rem 0.5rem;
   }
-  
+
   .action-buttons {
     flex-direction: column;
   }
-  
+
   .modal-content {
     margin: 0.5rem;
     max-width: none;
   }
-  
+
   .modal-header,
   .modal-body,
   .modal-footer {

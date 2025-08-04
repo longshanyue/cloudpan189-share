@@ -1,4 +1,5 @@
 import api from './index'
+import { JobStat } from './shared'
 
 // 存储相关接口类型定义
 export interface Storage {
@@ -15,6 +16,7 @@ export interface Storage {
     share_code?: string
     share_access_code?: string
   }
+  jobStatus?: JobStat
 }
 
 export interface AddStorageRequest {
