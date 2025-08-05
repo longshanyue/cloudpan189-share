@@ -131,50 +131,40 @@ func (s *service) doResponse(ctx *gin.Context, url string) {
 	if shared.Setting.MultipleStream {
 		ctx.Header("X-Transfer-Type", "multi_stream")
 
-		opts := []multistreamer.OptionFunc{
-			multistreamer.WithHeader(ctx.Request.Header),
-			multistreamer.WithContext(ctx),
-		}
+		httpReq := ctx.Request.Header.Clone()
+		httpReq.Set("Accept-Encoding", "identity")
+		httpReq.Del("Content-Type")
 
-		httpCode := http.StatusOK
-
-		rangeSpec, yes, err := multistreamer.ParseRangeHeader(ctx.Request.Header.Get("Range"))
+		streamer, err := multistreamer.NewStreamer(ctx, url, httpReq, multistreamer.WithLogger(s.logger))
 		if err != nil {
+			s.logger.Error("初始化失败", zap.Error(err), zap.String("url", url))
+
 			ctx.JSON(http.StatusInternalServerError, gin.H{
 				"code":    http.StatusInternalServerError,
-				"message": fmt.Sprintf("解析Range失败: %v", err),
+				"message": fmt.Sprintf("初始化失败: %v", err),
 			})
-			return
-		} else if yes {
-			opts = append(opts, multistreamer.WithRange(rangeSpec.Start, rangeSpec.End))
-			httpCode = http.StatusPartialContent
-		}
 
-		mt := multistreamer.New(url, ctx.Writer, opts...)
-
-		if err = mt.Init(); err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"code":    http.StatusInternalServerError,
-				"message": fmt.Sprintf("启动失败: %v", err),
-			})
 			return
 		}
 
-		if header, err := mt.GetResponseHeader(); err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"code":    http.StatusInternalServerError,
-				"message": fmt.Sprintf("获取响应头失败: %v", err),
-			})
-			return
-		} else {
-			for k, v := range header {
-				ctx.Header(k, v[0])
+		for k, v := range streamer.GetResponseHeader() {
+			ctx.Header(k, v[0])
+		}
+
+		ctx.Status(streamer.HTTPCode())
+
+		if err = streamer.Transfer(ctx, ctx.Writer); err != nil {
+			if s.isConnectionError(err) {
+				s.logger.Info("客户端连接断开",
+					zap.String("url", url),
+				)
+			} else {
+				s.logger.Error("文件下载转发失败",
+					zap.Error(err),
+					zap.String("url", url),
+				)
 			}
 		}
-
-		ctx.Status(httpCode)
-		_ = mt.Execute()
-
 	} else if shared.Setting.LocalProxy {
 		s.handleLocalProxy(ctx, url)
 	} else {
