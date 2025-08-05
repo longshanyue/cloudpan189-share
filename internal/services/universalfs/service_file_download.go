@@ -154,7 +154,16 @@ func (s *service) doResponse(ctx *gin.Context, url string) {
 		ctx.Status(streamer.HTTPCode())
 
 		if err = streamer.Transfer(ctx, ctx.Writer); err != nil {
-			s.logger.Error("传输失败", zap.Error(err), zap.String("url", url))
+			if s.isConnectionError(err) {
+				s.logger.Info("客户端连接断开",
+					zap.String("url", url),
+				)
+			} else {
+				s.logger.Error("文件下载转发失败",
+					zap.Error(err),
+					zap.String("url", url),
+				)
+			}
 		}
 	} else if shared.Setting.LocalProxy {
 		s.handleLocalProxy(ctx, url)
