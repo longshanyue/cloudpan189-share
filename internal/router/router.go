@@ -84,6 +84,7 @@ func StartHTTPServer() error {
 		settingRouter.POST("/modify_base_url", settingService.ModifyBaseURL())
 		settingRouter.POST("/toggle_enable_top_file_auto_refresh", settingService.ToggleEnableTopFileAutoRefresh())
 		settingRouter.POST("/modify_job_thread_count", settingService.ModifyJobThreadCount())
+		settingRouter.POST("/modify_auto_refresh_minutes", settingService.ModifyAutoRefreshMinutes())
 
 		openapiRouter.POST("/setting/init_system", settingService.InitSystem())
 	}

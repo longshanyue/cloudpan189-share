@@ -134,7 +134,7 @@
         <div class="setting-item">
           <div class="setting-label">
             <span class="label-text">挂载文件自动刷新</span>
-            <span class="label-desc">开启后，系统将自动刷新挂载的文件列表，频率：每10分钟执行一次，此功能不能保证文件列表的实时性，可在前台文件浏览页面使用<b>刷新索引</b>功能手动刷新</span>
+            <span class="label-desc">开启后，系统将自动刷新挂载的文件列表，此功能不能保证文件列表的实时性，可在前台文件浏览页面使用<b>刷新索引</b>功能手动刷新</span>
           </div>
           <div class="setting-control">
             <div class="custom-switch" @click="handleToggleEnableTopFileAutoRefresh">
@@ -146,6 +146,35 @@
               >
               <span class="switch-slider"></span>
             </div>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-label">
+            <span class="label-text">自动刷新间隔</span>
+            <span class="label-desc">设置挂载文件自动刷新的时间间隔，范围：5-120分钟</span>
+          </div>
+          <div class="setting-control">
+            <div class="thread-count-control">
+              <input 
+                v-model.number="autoRefreshMinutes"
+                type="range" 
+                min="5" 
+                max="120" 
+                step="5"
+                class="thread-slider"
+                :disabled="loading"
+                @input="handleAutoRefreshMinutesChange"
+              >
+              <span class="thread-count-value">{{ autoRefreshMinutes }}分钟</span>
+            </div>
+            <button 
+              @click="handleModifyAutoRefreshMinutes" 
+              class="btn btn-primary btn-sm"
+              :disabled="loading || autoRefreshMinutes === originalAutoRefreshMinutes"
+            >
+              {{ loading ? '保存中...' : '保存' }}
+            </button>
           </div>
         </div>
 
@@ -219,6 +248,8 @@ const baseURL = ref('')
 const originalBaseURL = ref('') // 用于存储原始基础URL
 const jobThreadCount = ref(1)
 const originalJobThreadCount = ref(1) // 用于存储原始任务线程数
+const autoRefreshMinutes = ref(10)
+const originalAutoRefreshMinutes = ref(10) // 用于存储原始自动刷新间隔
 
 // 定时器引用
 const timer = ref<NodeJS.Timeout | null>(null)
@@ -275,6 +306,8 @@ const fetchSettingData = async () => {
       originalBaseURL.value = data.baseURL
       jobThreadCount.value = data.jobThreadCount || 1
       originalJobThreadCount.value = data.jobThreadCount || 1
+      autoRefreshMinutes.value = data.autoRefreshMinutes || 10
+      originalAutoRefreshMinutes.value = data.autoRefreshMinutes || 10
     }
   } catch (error) {
     toast.error('获取设置失败')
@@ -477,6 +510,31 @@ const handleModifyJobThreadCount = async () => {
   } catch (error) {
     console.error('修改任务线程数失败:', error)
     toast.error('修改任务线程数失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 处理自动刷新间隔变化
+const handleAutoRefreshMinutesChange = () => {
+  // 实时更新显示值，但不保存
+}
+
+// 修改自动刷新间隔
+const handleModifyAutoRefreshMinutes = async () => {
+  if (autoRefreshMinutes.value < 5 || autoRefreshMinutes.value > 120) {
+    toast.warning('自动刷新间隔必须在5-120分钟之间')
+    return
+  }
+  
+  try {
+    loading.value = true
+    await settingStore.modifyAutoRefreshMinutes(autoRefreshMinutes.value)
+    originalAutoRefreshMinutes.value = autoRefreshMinutes.value
+    toast.success('自动刷新间隔修改成功')
+  } catch (error) {
+    console.error('修改自动刷新间隔失败:', error)
+    toast.error('修改自动刷新间隔失败')
   } finally {
     loading.value = false
   }

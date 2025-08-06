@@ -22,6 +22,7 @@ type Service interface {
 	ToggleEnableTopFileAutoRefresh() gin.HandlerFunc
 	InitSystem() gin.HandlerFunc
 	ModifyJobThreadCount() gin.HandlerFunc
+	ModifyAutoRefreshMinutes() gin.HandlerFunc
 }
 
 type service struct {

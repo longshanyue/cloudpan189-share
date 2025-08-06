@@ -124,6 +124,19 @@ export const useSettingStore = defineStore('setting', () => {
     }
   }
 
+  // 修改自动刷新间隔
+  const modifyAutoRefreshMinutes = async (autoRefreshMinutes: number) => {
+    try {
+      await settingApi.modifyAutoRefreshMinutes({ autoRefreshMinutes })
+      if (setting.value) {
+        setting.value.autoRefreshMinutes = autoRefreshMinutes
+      }
+    } catch (error) {
+      console.error('修改自动刷新间隔失败:', error)
+      throw error
+    }
+  }
+
   // 初始化系统
   const initSystem = async (data: InitSystemRequest) => {
     try {
@@ -148,6 +161,7 @@ export const useSettingStore = defineStore('setting', () => {
     toggleMultipleStream,
     toggleEnableTopFileAutoRefresh,
     modifyJobThreadCount,
+    modifyAutoRefreshMinutes,
     initSystem
   }
 })

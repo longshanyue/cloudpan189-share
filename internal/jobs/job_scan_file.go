@@ -73,6 +73,11 @@ func (s *ScanFileJob) doJob(ctx context.Context) bool {
 		}
 	}()
 
+	refreshMinutes := time.Duration(shared.Setting.AutoRefreshMinutes)
+	if refreshMinutes == 0 {
+		refreshMinutes = 10
+	}
+
 	select {
 	case <-s.ctx.Done():
 		s.logger.Info("scan file job stopped")
@@ -105,7 +110,7 @@ func (s *ScanFileJob) doJob(ctx context.Context) bool {
 				s.logger.Error("delete file error", zap.Error(err))
 			}
 		}
-	case <-time.After(time.Minute * 10):
+	case <-time.After(refreshMinutes * time.Minute):
 		if !shared.Setting.EnableTopFileAutoRefresh {
 			return true
 		}
