@@ -22,8 +22,10 @@
               <div class="token-name">{{ token.name }}</div>
               <div class="token-meta">
                 <span class="token-status" :class="getStatusClass(token.status)">{{ getStatusText(token.status) }}</span>
+                <span class="token-login-type" :class="getLoginTypeClass(token.loginType)">{{ getLoginTypeText(token.loginType) }}</span>
                 <span v-if="token.status === 1" class="token-expiry" :class="getExpiryClass(token.expiresIn)">{{ formatExpiry(token.expiresIn) }}</span>
                 <span class="token-date">创建于 {{ formatDate(token.createdAt) }}</span>
+                <span v-if="token.loginType ===2" style="color: #999; font-size: 12px">密码登录将在令牌有效期还剩7天时尝试更新</span>
               </div>
             </div>
             <div class="token-actions">
@@ -57,8 +59,47 @@
         </div>
         
         <div class="modal-body">
+          <!-- 登录方式选择 -->
+          <div class="login-type-selection" v-if="!selectedLoginType">
+            <div class="login-type-title">选择登录方式</div>
+            <div class="login-type-options">
+              <div class="login-type-option" @click="selectLoginType(1)">
+                 <div class="login-type-icon qr-icon">
+                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                     <rect x="3" y="3" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2" fill="none"/>
+                     <rect x="13" y="3" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2" fill="none"/>
+                     <rect x="3" y="13" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2" fill="none"/>
+                     <rect x="5" y="5" width="4" height="4" fill="currentColor"/>
+                     <rect x="15" y="5" width="4" height="4" fill="currentColor"/>
+                     <rect x="5" y="15" width="4" height="4" fill="currentColor"/>
+                     <rect x="13" y="13" width="2" height="2" fill="currentColor"/>
+                     <rect x="17" y="13" width="2" height="2" fill="currentColor"/>
+                     <rect x="19" y="15" width="2" height="2" fill="currentColor"/>
+                     <rect x="15" y="17" width="2" height="2" fill="currentColor"/>
+                     <rect x="13" y="19" width="2" height="2" fill="currentColor"/>
+                     <rect x="17" y="19" width="2" height="2" fill="currentColor"/>
+                     <rect x="19" y="19" width="2" height="2" fill="currentColor"/>
+                   </svg>
+                 </div>
+                 <div class="login-type-name">扫码登录</div>
+                 <div class="login-type-desc">使用天翼云盘APP扫描二维码</div>
+               </div>
+               <div class="login-type-option" @click="selectLoginType(2)">
+                 <div class="login-type-icon pwd-icon">
+                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                     <rect x="3" y="11" width="18" height="10" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none"/>
+                     <circle cx="12" cy="16" r="1" fill="currentColor"/>
+                     <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                   </svg>
+                 </div>
+                 <div class="login-type-name">密码登录</div>
+                 <div class="login-type-desc">使用用户名和密码登录</div>
+               </div>
+            </div>
+          </div>
+          
           <!-- 二维码显示区域 -->
-          <div class="qrcode-section" v-if="qrCodeData">
+          <div class="qrcode-section" v-if="selectedLoginType === 1 && qrCodeData">
             <div class="qrcode-container">
               <div class="qrcode-display" v-if="qrCodeData.qrCodeUrl">
                  <img :src="qrCodeData.qrCodeUrl" alt="二维码" class="qrcode-image" />
@@ -69,7 +110,13 @@
                  <div class="qrcode-uuid">{{ qrCodeData.uuid }}</div>
                </div>
               <div class="qrcode-placeholder" v-else>
-                <div class="qrcode-icon">📱</div>
+                <div class="qrcode-icon">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <path d="M12 21l-3-3h6l-3 3z" fill="currentColor"/>
+                  </svg>
+                </div>
                 <div class="qrcode-text">正在生成二维码...</div>
                 <div class="qrcode-uuid">{{ qrCodeData.uuid }}</div>
               </div>
@@ -91,10 +138,61 @@
             </div>
           </div>
           
-          <!-- 未生成二维码时的提示 -->
-          <div v-else class="qrcode-placeholder-empty">
-            <Icons name="tokens" size="3rem" class="empty-qr-icon" />
-            <div class="empty-qr-text">{{ isEditing ? '更新令牌需要重新扫码授权' : '点击下方按钮生成二维码开始授权' }}</div>
+          <!-- 扫码登录未生成二维码时的提示 -->
+          <div v-if="selectedLoginType === 1 && !qrCodeData" class="qrcode-placeholder-empty">
+            <div class="empty-qr-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="3" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2" fill="none"/>
+                <rect x="13" y="3" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2" fill="none"/>
+                <rect x="3" y="13" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2" fill="none"/>
+                <rect x="5" y="5" width="4" height="4" fill="currentColor"/>
+                <rect x="15" y="5" width="4" height="4" fill="currentColor"/>
+                <rect x="5" y="15" width="4" height="4" fill="currentColor"/>
+                <rect x="13" y="13" width="2" height="2" fill="currentColor"/>
+                <rect x="17" y="13" width="2" height="2" fill="currentColor"/>
+                <rect x="19" y="15" width="2" height="2" fill="currentColor"/>
+                <rect x="15" y="17" width="2" height="2" fill="currentColor"/>
+                <rect x="13" y="19" width="2" height="2" fill="currentColor"/>
+                <rect x="17" y="19" width="2" height="2" fill="currentColor"/>
+                <rect x="19" y="19" width="2" height="2" fill="currentColor"/>
+              </svg>
+            </div>
+            <div class="empty-qr-text">{{ isEditing ? '重新生成二维码进行授权' : '点击下方按钮生成二维码开始授权' }}</div>
+          </div>
+          
+          <!-- 密码登录表单 -->
+          <div class="password-login-section" v-if="selectedLoginType === 2 || (isEditing && showPasswordForm)">
+            <div v-if="formReady" class="password-form">
+              <div class="form-group">
+                <label class="form-label">用户名</label>
+                <input 
+                  v-model="username" 
+                  type="text" 
+                  placeholder="请输入天翼云盘用户名"
+                  class="form-input"
+                  autocomplete="off"
+                  :name="'username_' + randomId"
+                  readonly
+                  @focus="removeReadonly"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">密码</label>
+                <input 
+                  v-model="password" 
+                  type="password" 
+                  placeholder="请输入密码"
+                  class="form-input"
+                  autocomplete="new-password"
+                  :name="'password_' + randomId"
+                  readonly
+                  @focus="removeReadonly"
+                />
+              </div>
+            </div>
+            <div v-else class="form-loading">
+              <div class="form-loading-text">正在准备表单...</div>
+            </div>
           </div>
         </div>
         
@@ -102,12 +200,35 @@
           <button class="modal-btn secondary" @click="closeModal" :disabled="loading">
             取消
           </button>
+          
+          <!-- 返回按钮（在选择了登录方式后显示） -->
           <button 
+            v-if="selectedLoginType && !isEditing" 
+            class="modal-btn secondary" 
+            @click="goBack" 
+            :disabled="loading"
+          >
+            返回
+          </button>
+          
+          <!-- 扫码登录按钮 -->
+          <button 
+            v-if="selectedLoginType === 1 || (isEditing && !showPasswordForm)" 
             class="modal-btn primary" 
             @click="qrCodeData ? (isScanning ? stopQrcodeCheck() : startQrcodeCheck()) : handleGenerateQrcode()" 
             :disabled="loading"
           >
             {{ loading ? '处理中...' : (qrCodeData ? (isScanning ? '停止检测' : '我已扫码') : '开始扫码') }}
+          </button>
+          
+          <!-- 密码登录按钮 -->
+          <button 
+            v-if="(selectedLoginType === 2 || (isEditing && showPasswordForm)) && formReady" 
+            class="modal-btn primary" 
+            @click="handlePasswordLogin" 
+            :disabled="loading || !username.trim() || !password.trim()"
+          >
+            {{ loading ? '登录中...' : (isEditing ? '更新令牌' : '添加令牌') }}
           </button>
         </div>
       </div>
@@ -172,7 +293,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { cloudTokenApi, type CloudToken } from '@/api/cloudtoken'
 import Layout from '@/components/Layout.vue'
 import Icons from '@/components/Icons.vue'
@@ -199,6 +320,22 @@ const scanTimeLeft = ref(120)
 const scanTimer = ref<NodeJS.Timeout | null>(null)
 const editingTokenId = ref<number | null>(null)
 
+// 表单相关数据
+const selectedLoginType = ref<number | null>(null) // 1: 扫码登录, 2: 密码登录
+const username = ref('')
+const password = ref('')
+const showPasswordForm = ref(false)
+
+// 防止自动填充的相关数据
+const formReady = ref(false)
+const randomId = ref(Math.random().toString(36).substr(2, 9))
+
+// 移除readonly属性的方法
+const removeReadonly = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  target.removeAttribute('readonly')
+}
+
 // 获取令牌列表
 const fetchTokens = async () => {
   try {
@@ -216,9 +353,15 @@ const fetchTokens = async () => {
 const handleAddToken = () => {
   isEditing.value = false
   editingTokenId.value = null
+  selectedLoginType.value = null
+  username.value = ''
+  password.value = ''
   qrCodeData.value = null
   isScanning.value = false
   scanTimeLeft.value = 120
+  showPasswordForm.value = false
+  formReady.value = false
+  randomId.value = Math.random().toString(36).substr(2, 9)
   showModal.value = true
 }
 
@@ -229,14 +372,94 @@ const handleEditTokenName = (token: CloudToken) => {
   showNameModal.value = true
 }
 
-// 更新令牌（重新扫码）
+// 更新令牌
 const handleUpdateToken = (token: CloudToken) => {
   isEditing.value = true
   editingTokenId.value = token.id
+  editingToken.value = token
+  password.value = ''
   qrCodeData.value = null
   isScanning.value = false
   scanTimeLeft.value = 120
+  formReady.value = false
+  randomId.value = Math.random().toString(36).substr(2, 9)
+  
+  // 根据令牌的登录类型直接设置对应的显示方式
+  if (token.loginType === 1) {
+    // 扫码登录
+    selectedLoginType.value = 1
+    showPasswordForm.value = false
+    username.value = ''
+  } else {
+    // 密码登录 - 自动填充用户名
+    selectedLoginType.value = 2
+    showPasswordForm.value = true
+    username.value = token.username || '' // 从令牌数据中获取用户名
+    
+    // 延迟显示表单，避免自动填充
+    nextTick(() => {
+      setTimeout(() => {
+        formReady.value = true
+      }, 300)
+    })
+  }
+  
   showModal.value = true
+}
+
+// 选择登录类型
+const selectLoginType = (type: number) => {
+  selectedLoginType.value = type
+  
+  if (type === 2) {
+    // 选择密码登录时，延迟显示表单
+    formReady.value = false
+    randomId.value = Math.random().toString(36).substr(2, 9)
+    
+    nextTick(() => {
+      setTimeout(() => {
+        formReady.value = true
+      }, 300)
+    })
+  }
+}
+
+// 返回登录方式选择
+const goBack = () => {
+  selectedLoginType.value = null
+  qrCodeData.value = null
+  stopQrcodeCheck()
+  username.value = ''
+  password.value = ''
+  formReady.value = false
+}
+
+// 密码登录
+const handlePasswordLogin = async () => {
+  try {
+    loading.value = true
+    
+    const loginData: any = {
+      username: username.value.trim(),
+      password: password.value.trim()
+    }
+    
+    // 如果是编辑模式，传递令牌ID
+    if (isEditing.value && editingTokenId.value) {
+      loginData.id = editingTokenId.value
+    }
+    
+    await cloudTokenApi.usernameLogin(loginData)
+    
+    toast.success(isEditing.value ? '令牌更新成功' : '令牌添加成功')
+    closeModal()
+    await fetchTokens()
+  } catch (error: any) {
+    console.error('密码登录失败:', error)
+    toast.error(error?.msg || '用户名或密码错误')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 生成二维码
@@ -398,7 +621,14 @@ const closeModal = () => {
   qrCodeData.value = null
   isEditing.value = false
   editingTokenId.value = null
+  editingToken.value = null
+  selectedLoginType.value = null
+  username.value = ''
+  password.value = ''
+  showPasswordForm.value = false
+  formReady.value = false
   scanTimeLeft.value = 120
+  randomId.value = Math.random().toString(36).substr(2, 9)
 }
 
 const closeDeleteModal = () => {
@@ -441,6 +671,14 @@ const getStatusClass = (status: number) => {
 
 const getStatusText = (status: number) => {
   return status === 1 ? '正常' : '异常'
+}
+
+const getLoginTypeText = (loginType: number) => {
+  return loginType === 1 ? '扫码登录' : '密码登录'
+}
+
+const getLoginTypeClass = (loginType: number) => {
+  return loginType === 1 ? 'login-type-qrcode' : 'login-type-password'
 }
 
 const formatDate = (dateString: string) => {
@@ -643,6 +881,23 @@ onUnmounted(() => {
   color: #dc2626;
 }
 
+.token-login-type {
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+
+.token-login-type.login-type-qrcode {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.token-login-type.login-type-password {
+  background: #fef3c7;
+  color: #d97706;
+}
+
 .token-date {
   color: #6b7280;
 }
@@ -700,6 +955,124 @@ onUnmounted(() => {
 
 .empty-desc {
   font-size: 0.875rem;
+}
+
+/* 登录方式选择样式 */
+.login-type-selection {
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.login-type-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 1.5rem;
+}
+
+.login-type-options {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.login-type-option {
+  flex: 1;
+  max-width: 200px;
+  padding: 1.5rem 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #fafbfc;
+}
+
+.login-type-option:hover {
+  border-color: #3b82f6;
+  background: #f8fafc;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.login-type-icon {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 8px;
+  background: #f5f5f5;
+  margin: 0 auto 0.75rem auto;
+}
+
+.qr-icon {
+  background: #3b82f6;
+  color: white;
+}
+
+.pwd-icon {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+}
+
+.empty-qr-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  color: #9ca3af;
+}
+
+.qrcode-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  color: #6b7280;
+}
+
+.login-type-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.login-type-desc {
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.password-login-section {
+  padding: 1rem 0;
+}
+
+.password-form {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.form-loading {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.form-loading-text {
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* 弹窗样式 */
@@ -802,6 +1175,15 @@ onUnmounted(() => {
 
 .form-input::placeholder {
   color: #9ca3af;
+}
+
+.form-input[readonly] {
+  background-color: #f9fafb;
+  cursor: pointer;
+}
+
+.form-input[readonly]:focus {
+  background-color: white;
 }
 
 .modal-btn {

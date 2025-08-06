@@ -45,6 +45,7 @@ export interface StorageListRequest {
   currentPage?: number
   pageSize?: number
   name?: string
+  noPaginate?: boolean
 }
 
 export interface StorageListResponse {

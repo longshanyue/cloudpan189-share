@@ -1,4 +1,4 @@
-package cloudtoken
+package usergroup
 
 import (
 	"github.com/gin-gonic/gin"
@@ -7,12 +7,12 @@ import (
 )
 
 type Service interface {
-	InitQrcode() gin.HandlerFunc
-	CheckQrcode() gin.HandlerFunc
-	ModifyName() gin.HandlerFunc
+	Add() gin.HandlerFunc
 	Delete() gin.HandlerFunc
 	List() gin.HandlerFunc
-	UsernameLogin() gin.HandlerFunc
+	ModifyName() gin.HandlerFunc
+	BatchBindFiles() gin.HandlerFunc
+	GetBindFiles() gin.HandlerFunc
 }
 
 type service struct {
@@ -20,6 +20,7 @@ type service struct {
 	logger *zap.Logger
 }
 
+// NewService 创建用户组服务
 func NewService(db *gorm.DB, logger *zap.Logger) Service {
 	return &service{
 		db:     db,

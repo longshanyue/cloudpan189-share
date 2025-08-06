@@ -54,6 +54,16 @@ const router = createRouter({
       }
     },
     {
+      path: '/@usergroups',
+      name: 'UserGroups',
+      component: () => import('@/views/UserGroups.vue'),
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+        title: '用户组管理'
+      }
+    },
+    {
       path: '/@storage',
       name: 'Storage',
       component: () => import('@/views/Storage.vue'),

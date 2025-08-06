@@ -15,6 +15,7 @@ export interface Setting {
   enableTopFileAutoRefresh: boolean
   initialized: boolean // 系统是否初始化完成
   jobThreadCount: number // 任务线程数
+  autoRefreshMinutes: number // 自动刷新间隔（分钟）
 }
 
 export interface InitSystemRequest {
@@ -51,6 +52,10 @@ export interface ModifyBaseURLRequest {
 
 export interface ModifyJobThreadCountRequest {
   threadCount: number
+}
+
+export interface ModifyAutoRefreshMinutesRequest {
+  autoRefreshMinutes: number
 }
 
 // 设置API
@@ -98,6 +103,11 @@ export const settingApi = {
   // 修改任务线程数
   modifyJobThreadCount: (data: ModifyJobThreadCountRequest): Promise<void> => {
     return api.post('/setting/modify_job_thread_count', data)
+  },
+
+  // 修改自动刷新间隔
+  modifyAutoRefreshMinutes: (data: ModifyAutoRefreshMinutesRequest): Promise<void> => {
+    return api.post('/setting/modify_auto_refresh_minutes', data)
   },
 
   // 初始化系统

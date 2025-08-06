@@ -3,102 +3,112 @@
     <!-- 用户管理主卡片 -->
     <PageCard title="用户管理" subtitle="管理系统用户和权限设置">
       <SectionDivider />
-      
+
       <SubsectionTitle title="用户列表" />
-        <!-- 操作栏 -->
-        <div class="action-bar">
-          <div class="search-section">
-            <input 
-              v-model="searchUsername" 
-              type="text" 
-              placeholder="搜索用户名..." 
+      <!-- 操作栏 -->
+      <div class="action-bar">
+        <div class="search-section">
+          <label for="searchUsername" class="sr-only">搜索用户名</label>
+          <input
+              v-model="searchUsername"
+              type="text"
+              placeholder="搜索用户名..."
               class="search-input"
+              name="searchUsername"
+              id="searchUsername"
               @input="handleSearch"
-            >
-          </div>
-          <button @click="showAddModal = true" class="btn btn-primary">
-            <Icons name="add" size="1rem" class="btn-icon" />
-            添加用户
-          </button>
+          >
+        </div>
+        <button @click="showAddModal = true" class="btn btn-primary">
+          <Icons name="add" size="1rem" class="btn-icon" />
+          添加用户
+        </button>
+      </div>
+
+      <!-- 用户列表 -->
+      <div class="users-table-container">
+        <div v-if="loading" class="loading-state">
+          <div class="loading-spinner"></div>
+          <p>加载中...</p>
         </div>
 
-        <!-- 用户列表 -->
-        <div class="users-table-container">
-          <div v-if="loading" class="loading-state">
-            <div class="loading-spinner"></div>
-            <p>加载中...</p>
-          </div>
-          
-          <div v-else-if="users.length === 0" class="empty-state">
-            <Icons name="users" size="3rem" class="empty-icon" />
-            <h3>暂无用户</h3>
-            <p>{{ searchUsername ? '没有找到匹配的用户' : '还没有用户，点击上方按钮添加第一个用户' }}</p>
-          </div>
-          
-          <table v-else class="users-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>用户名</th>
-                <th>状态</th>
-                <th>权限</th>
-                <th>创建时间</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="user in users" :key="user.id" class="user-row">
-                <td>{{ user.id }}</td>
-                <td>
-                  <div class="user-info">
-                    <div class="user-avatar">
-                      <span>{{ user.username.charAt(0).toUpperCase() }}</span>
-                    </div>
-                    <span class="username">{{ user.username }}</span>
-                  </div>
-                </td>
-                <td>
+        <div v-else-if="users.length === 0" class="empty-state">
+          <Icons name="users" size="3rem" class="empty-icon" />
+          <h3>暂无用户</h3>
+          <p>{{ searchUsername ? '没有找到匹配的用户' : '还没有用户，点击上方按钮添加第一个用户' }}</p>
+        </div>
+
+        <table v-else class="users-table">
+          <thead>
+          <tr>
+            <th>ID</th>
+            <th>用户名</th>
+            <th>状态</th>
+            <th>用户组</th>
+            <th>权限</th>
+            <th>创建时间</th>
+            <th>操作</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr v-for="user in users" :key="user.id" class="user-row">
+            <td>{{ user.id }}</td>
+            <td>
+              <div class="user-info">
+                <div class="user-avatar">
+                  <span>{{ user.username.charAt(0).toUpperCase() }}</span>
+                </div>
+                <span class="username">{{ user.username }}</span>
+              </div>
+            </td>
+            <td>
                   <span :class="['status-badge', user.status === 1 ? 'status-active' : 'status-inactive']">
                     {{ user.status === 1 ? '正常' : '禁用' }}
                   </span>
-                </td>
-                <td>
-                  <div class="permissions">
-                    <span v-for="permission in getPermissionLabels(user.permissions)" 
-                          :key="permission" 
+            </td>
+            <td>
+              <span class="group-name">{{ user.groupName || '默认用户组' }}</span>
+            </td>
+            <td>
+              <div class="permissions">
+                    <span v-for="permission in getPermissionLabels(user.permissions)"
+                          :key="permission"
                           class="permission-tag">
                       {{ permission }}
                     </span>
-                  </div>
-                </td>
-                <td>{{ formatDate(user.createdAt) }}</td>
-                 <td>
-                   <div class="action-buttons">
-                     <button @click="editUser(user)" class="btn btn-sm btn-secondary">
-                       编辑
-                     </button>
-                     <button @click="resetPassword(user)" class="btn btn-sm btn-warning">
-                       重置密码
-                     </button>
-                     <button @click="deleteUser(user)" class="btn btn-sm btn-danger">
-                       删除
-                     </button>
-                   </div>
-                 </td>
-               </tr>
-             </tbody>
-           </table>
-            
-            <!-- 分页组件 -->
-            <Pagination 
-              v-if="total > 0"
-              :current-page="currentPage"
-              :page-size="pageSize"
-              :total="total"
-              @page-change="handlePageChange"
-              @page-size-change="handlePageSizeChange"
-            />
-        </div>
+              </div>
+            </td>
+            <td>{{ formatDate(user.createdAt) }}</td>
+            <td>
+              <div class="action-buttons">
+                <button @click="editUser(user)" class="btn btn-sm btn-secondary">
+                  编辑
+                </button>
+                <button @click="bindUserGroup(user)" class="btn btn-sm btn-primary">
+                  绑定用户组
+                </button>
+                <button @click="resetPassword(user)" class="btn btn-sm btn-warning">
+                  重置密码
+                </button>
+                <button @click="deleteUser(user)" class="btn btn-sm btn-danger">
+                  删除
+                </button>
+              </div>
+            </td>
+          </tr>
+          </tbody>
+        </table>
+
+        <!-- 分页组件 -->
+        <Pagination
+            v-if="total > 0"
+            :current-page="currentPage"
+            :page-size="pageSize"
+            :total="total"
+            @page-change="handlePageChange"
+            @page-size-change="handlePageSizeChange"
+        />
+      </div>
     </PageCard>
 
     <!-- 添加用户弹窗 -->
@@ -110,50 +120,62 @@
         </div>
         <div class="modal-body">
           <div class="form-group">
-            <label class="form-label">用户名</label>
-            <input 
-              v-model="newUser.username" 
-              type="text" 
-              class="form-input"
-              placeholder="请输入用户名（3-20字符）"
-              maxlength="20"
+            <label class="form-label" for="newUsername">用户名</label>
+            <input
+                v-model="newUser.username"
+                type="text"
+                class="form-input"
+                placeholder="请输入用户名（3-20字符）"
+                maxlength="20"
+                name="newUsername"
+                id="newUsername"
             >
           </div>
           <div class="form-group">
-            <label class="form-label">密码</label>
-            <input 
-              v-model="newUser.password" 
-              type="password" 
-              class="form-input"
-              placeholder="请输入密码（6-20字符）"
-              maxlength="20"
+            <label class="form-label" for="newPassword">密码</label>
+            <input
+                v-model="newUser.password"
+                type="password"
+                class="form-input"
+                placeholder="请输入密码（6-20字符）"
+                maxlength="20"
+                name="newPassword"
+                id="newPassword"
             >
           </div>
           <div class="form-group">
-            <label class="form-label">权限设置</label>
-            <div class="permission-checkboxes">
-              <label class="checkbox-item">
-                <input 
-                  type="checkbox" 
-                  v-model="newUser.permissions.base"
-                >
-                <span>基础权限（登录和查看信息）</span>
-              </label>
-              <label class="checkbox-item">
-                <input 
-                  type="checkbox" 
-                  v-model="newUser.permissions.davRead"
-                >
-                <span>WebDAV访问权限</span>
-              </label>
-              <label class="checkbox-item">
-                <input 
-                  type="checkbox" 
-                  v-model="newUser.permissions.admin"
-                >
-                <span>管理员权限</span>
-              </label>
-            </div>
+            <fieldset>
+              <legend class="form-label">权限设置</legend>
+              <div class="permission-checkboxes">
+                <label class="checkbox-item" for="newBasePermission">
+                  <input
+                      type="checkbox"
+                      v-model="newUser.permissions.base"
+                      name="newBasePermission"
+                      id="newBasePermission"
+                  >
+                  <span>基础权限（登录和查看信息）</span>
+                </label>
+                <label class="checkbox-item" for="newDavReadPermission">
+                  <input
+                      type="checkbox"
+                      v-model="newUser.permissions.davRead"
+                      name="newDavReadPermission"
+                      id="newDavReadPermission"
+                  >
+                  <span>WebDAV访问权限</span>
+                </label>
+                <label class="checkbox-item" for="newAdminPermission">
+                  <input
+                      type="checkbox"
+                      v-model="newUser.permissions.admin"
+                      name="newAdminPermission"
+                      id="newAdminPermission"
+                  >
+                  <span>管理员权限</span>
+                </label>
+              </div>
+            </fieldset>
           </div>
         </div>
         <div class="modal-footer">
@@ -173,42 +195,52 @@
           <button @click="closeEditModal" class="close-btn">✕</button>
         </div>
         <div class="modal-body">
-           <div class="form-group">
-             <label class="form-label">用户名</label>
-             <input 
-               v-model="editingUser.username" 
-               type="text" 
-               class="form-input"
-               disabled
-             >
-           </div>
-           <div class="form-group">
-              <label class="form-label">权限设置</label>
+          <div class="form-group">
+            <label class="form-label" for="editUsername">用户名</label>
+            <input
+                v-model="editingUser.username"
+                type="text"
+                class="form-input"
+                disabled
+                name="editUsername"
+                id="editUsername"
+            >
+          </div>
+          <div class="form-group">
+            <fieldset>
+              <legend class="form-label">权限设置</legend>
               <div class="permission-checkboxes">
-                <label class="checkbox-item">
-                  <input 
-                    type="checkbox" 
-                    v-model="editingUser.permissions.base"
+                <label class="checkbox-item" for="editBasePermission">
+                  <input
+                      type="checkbox"
+                      v-model="editingUser.permissions.base"
+                      name="editBasePermission"
+                      id="editBasePermission"
                   >
                   <span>基础权限（登录和查看信息）</span>
                 </label>
-                <label class="checkbox-item">
-                  <input 
-                    type="checkbox" 
-                    v-model="editingUser.permissions.davRead"
+                <label class="checkbox-item" for="editDavReadPermission">
+                  <input
+                      type="checkbox"
+                      v-model="editingUser.permissions.davRead"
+                      name="editDavReadPermission"
+                      id="editDavReadPermission"
                   >
                   <span>WebDAV访问权限</span>
                 </label>
-                <label class="checkbox-item">
-                  <input 
-                    type="checkbox" 
-                    v-model="editingUser.permissions.admin"
+                <label class="checkbox-item" for="editAdminPermission">
+                  <input
+                      type="checkbox"
+                      v-model="editingUser.permissions.admin"
+                      name="editAdminPermission"
+                      id="editAdminPermission"
                   >
                   <span>管理员权限（可以管理用户和系统设置）</span>
                 </label>
               </div>
-            </div>
-         </div>
+            </fieldset>
+          </div>
+        </div>
         <div class="modal-footer">
           <button @click="closeEditModal" class="btn btn-secondary">取消</button>
           <button @click="confirmEditUser" class="btn btn-primary" :disabled="editLoading">
@@ -228,13 +260,15 @@
         <div class="modal-body">
           <p class="reset-info">为用户 <strong>{{ resetPasswordUser?.username }}</strong> 重置密码</p>
           <div class="form-group">
-            <label class="form-label">新密码</label>
-            <input 
-              v-model="newPassword" 
-              type="password" 
-              class="form-input"
-              placeholder="请输入新密码（6-20字符）"
-              maxlength="20"
+            <label class="form-label" for="resetPasswordInput">新密码</label>
+            <input
+                v-model="newPassword"
+                type="password"
+                class="form-input"
+                placeholder="请输入新密码（6-20字符）"
+                maxlength="20"
+                name="resetPasswordInput"
+                id="resetPasswordInput"
             >
           </div>
         </div>
@@ -246,18 +280,58 @@
         </div>
       </div>
     </div>
+
+    <!-- 绑定用户组弹窗 -->
+    <div v-if="showBindGroupModal" class="modal-overlay" @click="closeBindGroupModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>绑定用户组</h3>
+          <button @click="closeBindGroupModal" class="close-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="bind-info">为用户 <strong>{{ bindGroupUser?.username }}</strong> 绑定用户组</p>
+
+          <!-- 用户组选择 -->
+          <div class="form-group">
+            <label for="userGroupSelect">
+              <div class="flex" style="justify-content: space-between">
+                <span>选择用户组：</span>
+                <span style="font-size: 11px; color: #666;">用户组用于控制用户可以看到哪些文件，默认用户组可看到所有文件。</span>
+              </div>
+            </label>
+            <Select
+                id="userGroupSelect"
+                v-model="selectedGroupId"
+                :options="userGroupOptions"
+                :disabled="groupLoading"
+                placeholder="请选择用户组"
+                empty-text="暂无用户组"
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="closeBindGroupModal" class="btn btn-secondary">取消</button>
+          <button @click="confirmBindUserGroup" class="btn btn-primary" :disabled="bindGroupLoading">
+            {{ bindGroupLoading ? '绑定中...' : '确认绑定' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </Layout>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, computed } from 'vue'
 import Layout from '@/components/Layout.vue'
 import Icons from '@/components/Icons.vue'
 import Pagination from '@/components/Pagination.vue'
 import PageCard from '@/components/PageCard.vue'
 import SectionDivider from '@/components/SectionDivider.vue'
 import SubsectionTitle from '@/components/SubsectionTitle.vue'
+
+import Select from '@/components/Select.vue'
 import { userApi, type User, type AddUserRequest, type UpdateUserRequest, type ModifyPasswordRequest } from '@/api/user'
+import { userGroupApi, type UserGroup } from '@/api/usergroup'
 import { toast } from '@/utils/toast'
 import { confirmDialog } from '@/utils/confirm'
 import { getPermissionLabels, calculatePermissions, parsePermissions, PERMISSIONS } from '@/utils/permissions'
@@ -295,6 +369,24 @@ const showPasswordModal = ref(false)
 const passwordLoading = ref(false)
 const resetPasswordUser = ref<User | null>(null)
 const newPassword = ref('')
+
+// 绑定用户组相关
+const showBindGroupModal = ref(false)
+const bindGroupLoading = ref(false)
+const groupLoading = ref(false)
+const bindGroupUser = ref<User | null>(null)
+const allUserGroups = ref<UserGroup[]>([])
+const selectedGroupId = ref<number>(0)
+
+const userGroupOptions = computed(() => {
+  const options = allUserGroups.value.map(group => ({
+    label: group.name,
+    value: group.id
+  }))
+  // 添加默认用户组选项
+  options.unshift({ label: '默认用户组', value: 0 })
+  return options
+})
 
 // 获取用户列表
 const fetchUsers = async () => {
@@ -389,10 +481,10 @@ const confirmAddUser = async () => {
       password: newUser.password,
       is_super: newUser.permissions.admin ? 1 : 0
     }
-    
+
     // 先添加用户
     const result = await userApi.addUser(addData)
-    
+
     // 如果需要设置完整权限，再调用更新接口
     const permissions = calculatePermissions(newUser.permissions)
     if (permissions !== (newUser.permissions.admin ? PERMISSIONS.ADMIN | PERMISSIONS.BASE : PERMISSIONS.BASE)) {
@@ -402,7 +494,7 @@ const confirmAddUser = async () => {
       }
       await userApi.updateUser(updateData)
     }
-    
+
     toast.success('用户添加成功')
     closeAddModal()
     fetchUsers()
@@ -437,7 +529,7 @@ const confirmEditUser = async () => {
       id: editingUser.value.id,
       permissions
     }
-    
+
     await userApi.updateUser(updateData)
     toast.success('用户权限更新成功')
     closeEditModal()
@@ -475,7 +567,7 @@ const confirmResetPassword = async () => {
       id: resetPasswordUser.value!.id,
       password: newPassword.value
     }
-    
+
     await userApi.modifyPassword(modifyData)
     toast.success('密码重置成功')
     closePasswordModal()
@@ -484,6 +576,58 @@ const confirmResetPassword = async () => {
     toast.error(error.msg || '重置密码失败')
   } finally {
     passwordLoading.value = false
+  }
+}
+
+// 绑定用户组相关函数
+const bindUserGroup = async (user: User) => {
+  bindGroupUser.value = user
+  showBindGroupModal.value = true
+
+  // 先设置当前用户的用户组ID，确保在获取用户组列表之前就有默认值
+  selectedGroupId.value = user.groupId || 0
+
+  try {
+    groupLoading.value = true
+    // 获取所有用户组
+    const groupsResponse = await userGroupApi.getUserGroupList({ currentPage: 1, pageSize: 1000 })
+    allUserGroups.value = groupsResponse.data || []
+
+    // 再次确认设置用户当前绑定的用户组ID（防止异步问题）
+    selectedGroupId.value = user.groupId || 0
+  } catch (error: any) {
+    console.error('获取用户组列表失败:', error)
+    toast.error('获取用户组列表失败')
+  } finally {
+    groupLoading.value = false
+  }
+}
+
+const closeBindGroupModal = () => {
+  showBindGroupModal.value = false
+  bindGroupUser.value = null
+  allUserGroups.value = []
+  selectedGroupId.value = 0
+}
+
+const confirmBindUserGroup = async () => {
+  try {
+    bindGroupLoading.value = true
+
+    // 调用绑定用户组接口
+    await userApi.bindGroup({
+      userId: bindGroupUser.value!.id,
+      groupId: selectedGroupId.value
+    })
+
+    toast.success('用户组绑定成功')
+    closeBindGroupModal()
+    fetchUsers() // 刷新用户列表
+  } catch (error: any) {
+    console.error('绑定用户组失败:', error)
+    toast.error(error.msg || '绑定用户组失败')
+  } finally {
+    bindGroupLoading.value = false
   }
 }
 
@@ -496,7 +640,7 @@ const deleteUser = async (user: User) => {
     cancelText: '取消',
     isDanger: true
   })
-  
+
   if (!confirmed) {
     return
   }
@@ -518,6 +662,31 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 屏幕阅读器专用的隐藏类 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* fieldset 和 legend 样式 */
+fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+legend {
+  padding: 0;
+  margin-bottom: 0.5rem;
+}
+
 /* 操作栏样式 */
 .action-bar {
   display: flex;
@@ -747,6 +916,19 @@ onMounted(() => {
   color: #991b1b;
 }
 
+/* 用户组名称 */
+.group-name {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  background: #f0f9ff;
+  color: #0369a1;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid #e0f2fe;
+}
+
 /* 权限标签 */
 .permissions {
   display: flex;
@@ -794,7 +976,6 @@ onMounted(() => {
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
-  overflow-y: auto;
 }
 
 .modal-content.small {
@@ -908,6 +1089,7 @@ onMounted(() => {
   width: 16px;
   height: 16px;
   accent-color: #3b82f6;
+  margin: 0;
 }
 
 .checkbox-item span {
@@ -926,6 +1108,41 @@ onMounted(() => {
   color: #92400e;
 }
 
+/* 绑定用户组信息 */
+.bind-info {
+  background: #eff6ff;
+  border: 1px solid #3b82f6;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  color: #1e40af;
+}
+
+/* 表单选择框样式 */
+.form-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background-color: white;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-select:disabled {
+  background-color: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .action-bar {
@@ -933,29 +1150,29 @@ onMounted(() => {
     gap: 1rem;
     align-items: stretch;
   }
-  
+
   .search-section {
     max-width: none;
   }
-  
+
   .users-table {
     font-size: 0.75rem;
   }
-  
+
   .users-table th,
   .users-table td {
     padding: 0.75rem 0.5rem;
   }
-  
+
   .action-buttons {
     flex-direction: column;
   }
-  
+
   .modal-content {
     margin: 0.5rem;
     max-width: none;
   }
-  
+
   .modal-header,
   .modal-body,
   .modal-footer {

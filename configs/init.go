@@ -80,6 +80,8 @@ func Init() {
 		new(models.Setting),
 		new(models.CloudToken),
 		new(models.VirtualFile),
+		new(models.UserGroup),
+		new(models.Group2File),
 	); err != nil {
 		panic(err)
 	}

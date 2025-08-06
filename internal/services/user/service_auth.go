@@ -113,6 +113,7 @@ func (s *service) AuthMiddleware(permission uint8) gin.HandlerFunc {
 		ctx.Set("user_id", uid)
 		ctx.Set("username", username)
 		ctx.Set("permissions", user.Permissions)
+		ctx.Set("group_id", user.GroupID)
 
 		ctx.Next()
 	}
@@ -197,6 +198,7 @@ func (s *service) BasicAuthMiddleware(permission uint8) gin.HandlerFunc {
 		ctx.Set("user_id", user.ID)
 		ctx.Set("username", username)
 		ctx.Set("permissions", user.Permissions)
+		ctx.Set("group_id", user.GroupID)
 
 		ctx.Next()
 	}

@@ -21,6 +21,13 @@ func main() {
 
 	defer scanJob.Stop()
 
+	autoLoginJob := jobs.NewAutoLoginJob(configs.DB(), configs.Logger())
+	if err := autoLoginJob.Start(context.Background()); err != nil {
+		panic(err)
+	}
+
+	defer autoLoginJob.Stop()
+
 	if err := router.StartHTTPServer(); err != nil {
 		configs.Logger().Error("start http server error", zap.Error(err))
 	}
