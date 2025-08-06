@@ -27,6 +27,15 @@ func (s *service) Del() gin.HandlerFunc {
 			return
 		}
 
+		if req.ID == 1 {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"code": http.StatusBadRequest,
+				"msg":  "创始人不能删除",
+			})
+
+			return
+		}
+
 		result := s.db.WithContext(ctx).Where("id = ?", req.ID).Delete(&models.User{})
 		if result.Error != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{

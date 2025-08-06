@@ -4,6 +4,7 @@ go 1.24.4
 
 require (
 	github.com/bytedance/gopkg v0.1.2
+	github.com/deckarep/golang-set/v2 v2.8.0
 	github.com/gin-gonic/gin v1.10.1
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-playground/locales v0.14.1
@@ -13,6 +14,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
+	github.com/samber/lo v1.51.0
 	github.com/xxcheng123/cloudpan189-interface v1.0.1
 	github.com/xxcheng123/multistreamer v1.0.1
 	github.com/zeromicro/go-zero v1.8.5

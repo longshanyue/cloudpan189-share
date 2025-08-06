@@ -3,6 +3,7 @@ output
 data/share.db
 session.json
 .idea
+.vscode
 
 fe/node_modules
 fe/llm-prompt.txt

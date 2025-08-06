@@ -24,6 +24,7 @@ type Service interface {
 	Info() gin.HandlerFunc
 	ModifyPass() gin.HandlerFunc
 	ModifyOwnPass() gin.HandlerFunc
+	BindGroup() gin.HandlerFunc
 }
 
 type service struct {

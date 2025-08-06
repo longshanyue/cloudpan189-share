@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"github.com/xxcheng123/cloudpan189-share/internal/services/usergroup"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -32,6 +33,7 @@ func StartHTTPServer() error {
 		settingService     = settingS.NewService(db, logger)
 		storageService     = storage.NewService(db, logger)
 		universalFsService = universalfs.NewService(db, logger)
+		userGroupService   = usergroup.NewService(db, logger)
 	)
 
 	openapiRouter := engine.Group("/api")
@@ -45,9 +47,20 @@ func StartHTTPServer() error {
 		userRouter.POST("/update", userService.AuthMiddleware(models.PermissionAdmin), userService.Update())
 		userRouter.GET("/list", userService.AuthMiddleware(models.PermissionAdmin), userService.List())
 		userRouter.POST("/modify_pass", userService.AuthMiddleware(models.PermissionAdmin), userService.ModifyPass())
+		userRouter.POST("/bind_group", userService.AuthMiddleware(models.PermissionAdmin), userService.BindGroup())
 
 		userRouter.GET("/info", userService.AuthMiddleware(models.PermissionBase), userService.Info())
 		userRouter.POST("/modify_own_pass", userService.AuthMiddleware(models.PermissionBase), userService.ModifyOwnPass())
+	}
+
+	userGroupRouter := openapiRouter.Group("/user_group", userService.AuthMiddleware(models.PermissionAdmin))
+	{
+		userGroupRouter.POST("/add", userGroupService.Add())
+		userGroupRouter.POST("/delete", userGroupService.Delete())
+		userGroupRouter.POST("/modify_name", userGroupService.ModifyName())
+		userGroupRouter.POST("/batch_bind_files", userGroupService.BatchBindFiles())
+		userGroupRouter.GET("/bind_files", userGroupService.GetBindFiles())
+		userGroupRouter.POST("/list", userGroupService.List())
 	}
 
 	cloudTokenRouter := openapiRouter.Group("/cloud_token", userService.AuthMiddleware(models.PermissionAdmin))

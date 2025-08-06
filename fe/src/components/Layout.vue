@@ -75,6 +75,12 @@
                 </router-link>
               </li>
               <li class="nav-item">
+                <router-link to="/@usergroups" class="nav-link" :class="{ active: $route.name === 'UserGroups' }">
+                  <Icons name="group" class="nav-icon" />
+                  <span class="nav-text">用户组管理</span>
+                </router-link>
+              </li>
+              <li class="nav-item">
                 <router-link to="/@storage" class="nav-link" :class="{ active: $route.name === 'Storage' }">
                   <Icons name="storage" class="nav-icon" />
                   <span class="nav-text">存储管理</span>

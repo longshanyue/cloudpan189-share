@@ -7,6 +7,13 @@
     <path d="M16 7c0-2.21-1.79-4-4-4S8 4.79 8 7s1.79 4 4 4 4-1.79 4-4zm-4 6c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4z"/>
   </svg>
   
+  <svg v-else-if="name === 'group'" viewBox="0 0 24 24" fill="currentColor" class="icon">
+    <path d="M9 12c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-1.5c0-2.33-4.67-3.5-7-3.5z"/>
+    <path d="M16.5 12c1.38 0 2.5-1.12 2.5-2.5S17.88 7 16.5 7 14 8.12 14 9.5s1.12 2.5 2.5 2.5zm0 2c-1.83 0-5.5.92-5.5 2.75V18h11v-1.25c0-1.83-3.67-2.75-5.5-2.75z"/>
+    <circle cx="9" cy="9" r="1.5" fill="white"/>
+    <circle cx="16.5" cy="9.5" r="1.2" fill="white"/>
+  </svg>
+  
   <svg v-else-if="name === 'storage'" viewBox="0 0 24 24" fill="currentColor" class="icon">
     <path d="M2 20h20v-4H2v4zm2-3h2v2H4v-2zM2 4v4h20V4H2zm4 3H4V5h2v2zm-4 7h20v-4H2v4zm2-3h2v2H4v-2z"/>
   </svg>

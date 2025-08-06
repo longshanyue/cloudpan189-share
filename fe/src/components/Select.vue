@@ -19,7 +19,7 @@
           v-for="option in options" 
           :key="option.value"
           class="select-option"
-          :class="{ 'select-option-selected': option.value === modelValue }"
+          :class="{ 'select-option-selected': option.value == modelValue }"
           @click="selectOption(option)"
         >
           {{ option.label }}
@@ -65,7 +65,8 @@ const isOpen = ref(false)
 const selectRef = ref<HTMLElement>()
 
 const selectedOption = computed(() => {
-  return props.options.find(option => option.value === props.modelValue)
+  // 使用宽松比较来查找选中的选项
+  return props.options.find(option => option.value == props.modelValue)
 })
 
 const toggleDropdown = () => {

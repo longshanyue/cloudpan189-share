@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/samber/lo"
+	"go.uber.org/zap"
 	"net/http"
 	"net/url"
 	"path"
@@ -11,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
@@ -37,6 +40,30 @@ func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 		var fullPaths = make([]string, 0)
 		var session = new(ReadSession)
 		var file = new(models.VirtualFile)
+
+		var (
+			groupId      = ctx.GetInt64("group_id")
+			groupFileSet = mapset.NewSet[int64]()
+		)
+
+		if groupId != 0 {
+			groupFiles := make([]*models.Group2File, 0)
+
+			if err = s.db.WithContext(ctx).Model(new(models.Group2File)).Where("group_id", groupId).Find(&groupFiles).Error; err != nil {
+				s.logger.Error("get group files failure", zap.Error(err))
+
+				ctx.JSON(http.StatusInternalServerError, gin.H{
+					"code":    http.StatusInternalServerError,
+					"message": "获取用户组文件关系失败",
+				})
+
+				return
+			}
+
+			for _, groupFile := range groupFiles {
+				groupFileSet.Add(groupFile.FileId)
+			}
+		}
 
 		if len(paths) == 0 {
 			file = &models.VirtualFile{
@@ -77,6 +104,16 @@ func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 					}
 				}
 
+				if tmpFile.IsTop == 1 && groupId != 0 && !groupFileSet.Contains(tmpFile.ID) {
+					// 没有权限
+					ctx.JSON(http.StatusForbidden, gin.H{
+						"code":    http.StatusForbidden,
+						"message": "no permission",
+					})
+
+					return
+				}
+
 				fullPaths = append(fullPaths, p)
 				pid = tmpFile.ID
 				file = tmpFile
@@ -108,6 +145,16 @@ func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 				})
 			}
 
+			if groupId != 0 {
+				f.Children = lo.Filter(f.Children, func(item *FileInfo, _ int) bool {
+					if item.IsTop == 1 && !groupFileSet.Contains(item.ID) {
+						return false
+					}
+
+					return true
+				})
+			}
+
 			sort.Slice(f.Children, func(i, j int) bool {
 				if f.Children[i].IsFolder != f.Children[j].IsFolder {
 					return f.Children[i].IsFolder > f.Children[j].IsFolder
@@ -115,7 +162,6 @@ func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 
 				return f.Children[i].Rev > f.Children[j].Rev
 			})
-
 		} else {
 			values := enc(url.Values{
 				"id":     []string{fmt.Sprintf("%d", file.ID)},

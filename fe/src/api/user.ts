@@ -22,6 +22,8 @@ export interface User {
   version: number
   createdAt: string
   updatedAt: string
+  groupName?: string
+  groupId: number
 }
 
 export interface RefreshTokenRequest {
@@ -61,6 +63,18 @@ export interface UserListResponse {
   currentPage: number
   pageSize: number
   data: User[]
+}
+
+export interface BindGroupRequest {
+  userId: number
+  groupId: number // 0 表示默认用户组
+}
+ 
+export interface BindGroupResponse {
+  userId: number
+  groupId: number
+  groupName: string
+  rowsAffected: number
 }
 
 // 用户API
@@ -108,5 +122,9 @@ export const userApi = {
   // 获取用户列表
   getUserList: (params: UserListRequest): Promise<UserListResponse> => {
     return api.get('/user/list', { params })
+  },
+
+  bindGroup: (data: BindGroupRequest): Promise<BindGroupResponse> => {
+    return api.post('/user/bind_group', data)
   },
 }
