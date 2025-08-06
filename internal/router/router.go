@@ -70,6 +70,7 @@ func StartHTTPServer() error {
 		cloudTokenRouter.POST("/modify_name", cloudTokenService.ModifyName())
 		cloudTokenRouter.POST("/delete", cloudTokenService.Delete())
 		cloudTokenRouter.GET("/list", cloudTokenService.List())
+		cloudTokenRouter.POST("/username_login", cloudTokenService.UsernameLogin())
 	}
 
 	openapiRouter.GET("/setting/get", settingService.Get())

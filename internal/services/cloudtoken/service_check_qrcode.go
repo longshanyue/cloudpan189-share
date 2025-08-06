@@ -56,6 +56,8 @@ func (s *service) CheckQrcode() gin.HandlerFunc {
 				Status:      1,
 				AccessToken: resp.AccessToken,
 				ExpiresIn:   resp.ExpiresIn,
+				LoginType:   models.LoginTypeScan,
+				Addition:    map[string]interface{}{},
 			}).Error; err != nil {
 				ctx.JSON(http.StatusInternalServerError, gin.H{
 					"code": http.StatusInternalServerError,

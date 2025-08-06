@@ -12,6 +12,7 @@ type Service interface {
 	ModifyName() gin.HandlerFunc
 	Delete() gin.HandlerFunc
 	List() gin.HandlerFunc
+	UsernameLogin() gin.HandlerFunc
 }
 
 type service struct {
