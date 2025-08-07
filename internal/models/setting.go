@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"gorm.io/gorm"
+	"strconv"
+	"time"
+)
 
 type Setting struct {
 	ID                       int64     `gorm:"primaryKey" json:"id"`
@@ -20,4 +24,123 @@ type Setting struct {
 
 func (s *Setting) TableName() string {
 	return "setting"
+}
+
+type SettingDictValue string
+
+func (s SettingDictValue) Value() string {
+	return string(s)
+}
+
+func (s SettingDictValue) Int() int {
+	i, _ := strconv.Atoi(string(s))
+
+	return i
+}
+
+func (s SettingDictValue) Int64() int64 {
+	i, _ := strconv.ParseInt(string(s), 10, 64)
+
+	return i
+}
+
+func (s SettingDictValue) Bool() bool {
+	b, _ := strconv.ParseBool(string(s))
+
+	return b
+}
+
+func (s SettingDictValue) Float64() float64 {
+	f, _ := strconv.ParseFloat(string(s), 64)
+
+	return f
+}
+
+type SettingDict struct {
+	ID        int64            `gorm:"primaryKey" json:"id"`
+	Key       string           `gorm:"column:key;type:varchar(255);not null" json:"key"`
+	Value     SettingDictValue `gorm:"column:value;type:varchar(255);not null" json:"value"`
+	Type      string           `gorm:"column:type;type:varchar(255);not null" json:"type"`
+	CreatedAt time.Time        `gorm:"column:created_at;autoCreateTime;type:datetime;default:CURRENT_TIMESTAMP" json:"createdAt"`
+	UpdatedAt time.Time        `gorm:"column:updated_at;autoUpdateTime;type:datetime;default:CURRENT_TIMESTAMP;on update:CURRENT_TIMESTAMP" json:"updatedAt"`
+}
+
+func (s *SettingDict) TableName() string {
+	return "setting_dicts"
+}
+
+const (
+	SettingDictKeyMultipleStreamThreadCount = "multiple_stream_thread_count"
+	SettingDictKeyMultipleStreamChunkSize   = "multiple_stream_chunk_size"
+)
+
+const (
+	DefaultMultipleStreamThreadCount = 6
+	DefaultMultipleStreamChunkSize   = 1024 * 1024 * 4
+)
+
+func (s *SettingDict) query(db *gorm.DB, key string) (string, error) {
+	var m = new(SettingDict)
+
+	if err := db.Where("key", key).First(m).Error; err != nil {
+		return "", err
+	}
+
+	return string(m.Value), nil
+}
+
+func (s *SettingDict) store(db *gorm.DB, key, value string, typ string) *gorm.DB {
+	var count int64
+
+	if result := db.Model(s).Where("key", key).Count(&count); result.Error != nil {
+		return result
+	}
+
+	if count > 0 {
+		return db.Model(s).Where("key", key).Update("value", value)
+	}
+
+	return db.Create(&SettingDict{
+		Key:   key,
+		Value: SettingDictValue(value),
+		Type:  typ,
+	})
+}
+
+func (s *SettingDict) GetMultipleStreamThreadCount(db *gorm.DB) int {
+	value, err := s.query(db, SettingDictKeyMultipleStreamThreadCount)
+	if err != nil {
+		return DefaultMultipleStreamThreadCount
+	}
+
+	var v int64
+
+	if v, err = strconv.ParseInt(value, 10, 64); err != nil {
+		return DefaultMultipleStreamThreadCount
+	}
+
+	return int(v)
+}
+
+func (s *SettingDict) SetMultipleStreamThreadCount(db *gorm.DB, value int) *gorm.DB {
+	return s.store(db, SettingDictKeyMultipleStreamThreadCount, strconv.FormatInt(int64(value), 10), "int")
+}
+
+func (s *SettingDict) GetMultipleStreamChunkSize(db *gorm.DB) int64 {
+	value, err := s.query(db, SettingDictKeyMultipleStreamChunkSize)
+	if err != nil {
+		return DefaultMultipleStreamChunkSize
+	}
+
+	var v int64
+
+	if v, err = strconv.ParseInt(value, 10, 64); err != nil {
+		return DefaultMultipleStreamChunkSize
+	}
+
+	return v
+}
+
+func (s *SettingDict) SetMultipleStreamChunkSize(db *gorm.DB, value int64) *gorm.DB {
+	return s.store(db, SettingDictKeyMultipleStreamChunkSize, strconv.FormatInt(value, 10), "int64")
 }

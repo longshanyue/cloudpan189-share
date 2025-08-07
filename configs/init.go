@@ -82,6 +82,7 @@ func Init() {
 		new(models.VirtualFile),
 		new(models.UserGroup),
 		new(models.Group2File),
+		new(models.SettingDict),
 	); err != nil {
 		panic(err)
 	}
@@ -108,6 +109,20 @@ func Init() {
 	var setting = new(models.Setting)
 	if err = db.First(setting).Error; err != nil {
 		panic(err)
+	}
+
+	var dicts = make([]*models.SettingDict, 0)
+	if err = db.Model(new(models.SettingDict)).Find(&dicts).Error; err != nil {
+		panic(err)
+	}
+
+	for _, dict := range dicts {
+		switch dict.Key {
+		case models.SettingDictKeyMultipleStreamThreadCount:
+			shared.MultipleStreamThreadCount = dict.Value.Int()
+		case models.SettingDictKeyMultipleStreamChunkSize:
+			shared.MultipleStreamChunkSize = dict.Value.Int64()
+		}
 	}
 
 	shared.Setting = setting

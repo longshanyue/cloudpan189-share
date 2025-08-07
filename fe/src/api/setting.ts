@@ -8,7 +8,7 @@ export interface Setting {
   enableAuth: boolean
   localProxy: boolean
   multipleStream: boolean
-  runTimes: number  // 后端实际返回的字段名
+  runTimes: number  // 已经运行的时间
   createdAt: string
   updatedAt: string
   baseURL: string
@@ -16,6 +16,8 @@ export interface Setting {
   initialized: boolean // 系统是否初始化完成
   jobThreadCount: number // 任务线程数
   autoRefreshMinutes: number // 自动刷新间隔（分钟）
+  multipleStreamThreadCount: number // 多线程流线程数
+  multipleStreamChunkSize: number // 多线程流块大小
 }
 
 export interface InitSystemRequest {
@@ -56,6 +58,21 @@ export interface ModifyJobThreadCountRequest {
 
 export interface ModifyAutoRefreshMinutesRequest {
   autoRefreshMinutes: number
+}
+
+// 新增：修改多线程流线程数请求
+export interface ModifyMultipleStreamThreadCountRequest {
+  multipleStreamThreadCount: number // 1-64之间
+}
+
+// 新增：修改多线程流块大小请求
+export interface ModifyMultipleStreamChunkSizeRequest {
+  multipleStreamChunkSize: number // 512KB-32MB之间
+}
+
+// 新增：修改操作的通用响应
+export interface ModifyResponse {
+  rowsAffected: number
 }
 
 // 设置API
@@ -108,6 +125,16 @@ export const settingApi = {
   // 修改自动刷新间隔
   modifyAutoRefreshMinutes: (data: ModifyAutoRefreshMinutesRequest): Promise<void> => {
     return api.post('/setting/modify_auto_refresh_minutes', data)
+  },
+
+  // 新增：修改多线程流线程数
+  modifyMultipleStreamThreadCount: (data: ModifyMultipleStreamThreadCountRequest): Promise<ModifyResponse> => {
+    return api.post('/setting/modify_multiple_stream_thread_count', data)
+  },
+
+  // 新增：修改多线程流块大小
+  modifyMultipleStreamChunkSize: (data: ModifyMultipleStreamChunkSizeRequest): Promise<ModifyResponse> => {
+    return api.post('/setting/modify_multiple_stream_chunk_size', data)
   },
 
   // 初始化系统

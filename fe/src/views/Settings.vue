@@ -131,6 +131,66 @@
           </div>
         </div>
 
+        <!-- 多线程流线程数设置 -->
+        <div class="setting-item" v-if="settingStore.setting?.multipleStream">
+          <div class="setting-label">
+            <span class="label-text">多线程流线程数</span>
+            <span class="label-desc">设置多线程流式下载的并发线程数，范围：1-64，太多的线程数可能会导致加载时间过长甚至程序崩溃</span>
+          </div>
+          <div class="setting-control">
+            <div class="thread-count-control">
+              <input
+                v-model.number="multipleStreamThreadCount"
+                type="range"
+                min="1"
+                max="64"
+                step="1"
+                class="thread-slider"
+                :disabled="loading"
+                @input="handleMultipleStreamThreadCountChange"
+              >
+              <span class="thread-count-value">{{ multipleStreamThreadCount }}</span>
+            </div>
+            <button
+              @click="handleModifyMultipleStreamThreadCount"
+              class="btn btn-primary btn-sm"
+              :disabled="loading || multipleStreamThreadCount === originalMultipleStreamThreadCount"
+            >
+              {{ loading ? '保存中...' : '保存' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 多线程流块大小设置 -->
+        <div class="setting-item" v-if="settingStore.setting?.multipleStream">
+          <div class="setting-label">
+            <span class="label-text">多线程流块大小</span>
+            <span class="label-desc">设置每个下载块的大小，范围：512KB-8MB，较大的块大小可能提升性能但会增加内存使用</span>
+          </div>
+          <div class="setting-control">
+            <div class="thread-count-control">
+              <input
+                v-model.number="multipleStreamChunkSize"
+                type="range"
+                min="512"
+                max="8192"
+                step="512"
+                class="thread-slider"
+                :disabled="loading"
+                @input="handleMultipleStreamChunkSizeChange"
+              >
+              <span class="thread-count-value">{{ formatChunkSize(multipleStreamChunkSize) }}</span>
+            </div>
+            <button
+              @click="handleModifyMultipleStreamChunkSize"
+              class="btn btn-primary btn-sm"
+              :disabled="loading || multipleStreamChunkSize === originalMultipleStreamChunkSize"
+            >
+              {{ loading ? '保存中...' : '保存' }}
+            </button>
+          </div>
+        </div>
+
         <div class="setting-item">
           <div class="setting-label">
             <span class="label-text">挂载文件自动刷新</span>
@@ -138,9 +198,9 @@
           </div>
           <div class="setting-control">
             <div class="custom-switch" @click="handleToggleEnableTopFileAutoRefresh">
-              <input 
-                type="checkbox" 
-                :checked="settingStore.setting?.enableTopFileAutoRefresh" 
+              <input
+                type="checkbox"
+                :checked="settingStore.setting?.enableTopFileAutoRefresh"
                 :disabled="loading"
                 class="switch-input"
               >
@@ -156,11 +216,11 @@
           </div>
           <div class="setting-control">
             <div class="thread-count-control">
-              <input 
+              <input
                 v-model.number="autoRefreshMinutes"
-                type="range" 
-                min="5" 
-                max="120" 
+                type="range"
+                min="5"
+                max="120"
                 step="5"
                 class="thread-slider"
                 :disabled="loading"
@@ -168,8 +228,8 @@
               >
               <span class="thread-count-value">{{ autoRefreshMinutes }}分钟</span>
             </div>
-            <button 
-              @click="handleModifyAutoRefreshMinutes" 
+            <button
+              @click="handleModifyAutoRefreshMinutes"
               class="btn btn-primary btn-sm"
               :disabled="loading || autoRefreshMinutes === originalAutoRefreshMinutes"
             >
@@ -185,11 +245,11 @@
           </div>
           <div class="setting-control">
             <div class="thread-count-control">
-              <input 
+              <input
                 v-model.number="jobThreadCount"
-                type="range" 
-                min="1" 
-                max="8" 
+                type="range"
+                min="1"
+                max="8"
                 step="1"
                 class="thread-slider"
                 :disabled="loading"
@@ -197,8 +257,8 @@
               >
               <span class="thread-count-value">{{ jobThreadCount }}</span>
             </div>
-            <button 
-              @click="handleModifyJobThreadCount" 
+            <button
+              @click="handleModifyJobThreadCount"
               class="btn btn-primary btn-sm"
               :disabled="loading || jobThreadCount === originalJobThreadCount"
             >
@@ -206,15 +266,15 @@
             </button>
           </div>
         </div>
-        
+
         <div class="setting-item">
           <div class="setting-label">
             <span class="label-text">API密钥</span>
             <span class="label-desc">刷新后所有已登录账号都将重新登录系统（包括当前账号）</span>
           </div>
           <div class="setting-control">
-            <button 
-              @click="handleRefreshKey" 
+            <button
+              @click="handleRefreshKey"
               class="btn btn-danger btn-sm"
               :disabled="loading"
             >
@@ -222,7 +282,7 @@
             </button>
           </div>
         </div>
-        
+
         <SectionDivider />
     </PageCard>
   </Layout>
@@ -251,6 +311,12 @@ const originalJobThreadCount = ref(1) // 用于存储原始任务线程数
 const autoRefreshMinutes = ref(10)
 const originalAutoRefreshMinutes = ref(10) // 用于存储原始自动刷新间隔
 
+// 新增：多线程流相关参数
+const multipleStreamThreadCount = ref(6)
+const originalMultipleStreamThreadCount = ref(6) // 用于存储原始多线程流线程数
+const multipleStreamChunkSize = ref(4096) // 默认4MB，以KB为单位
+const originalMultipleStreamChunkSize = ref(4096) // 用于存储原始多线程流块大小
+
 // 定时器引用
 const timer = ref<NodeJS.Timeout | null>(null)
 
@@ -259,11 +325,11 @@ const formatRunTime = (seconds: number): string => {
   if (seconds < 60) {
     return `${seconds}秒`
   }
-  
+
   const minutes = Math.floor(seconds / 60)
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
-  
+
   if (days > 0) {
     const remainingHours = hours % 24
     const remainingMinutes = minutes % 60
@@ -279,7 +345,7 @@ const formatRunTime = (seconds: number): string => {
 // 格式化日期
 const formatDate = (dateString?: string): string => {
   if (!dateString) return '未知'
-  
+
   try {
     const date = new Date(dateString)
     return date.toLocaleDateString('zh-CN', {
@@ -292,6 +358,15 @@ const formatDate = (dateString?: string): string => {
   } catch (error) {
     return '格式错误'
   }
+}
+
+// 新增：格式化块大小显示
+const formatChunkSize = (sizeKB: number): string => {
+  if (sizeKB >= 1024) {
+    const sizeMB = sizeKB / 1024
+    return `${sizeMB}MB`
+  }
+  return `${sizeKB}KB`
 }
 
 // 获取设置数据
@@ -308,6 +383,13 @@ const fetchSettingData = async () => {
       originalJobThreadCount.value = data.jobThreadCount || 1
       autoRefreshMinutes.value = data.autoRefreshMinutes || 10
       originalAutoRefreshMinutes.value = data.autoRefreshMinutes || 10
+
+      // 新增：设置多线程流相关参数
+      multipleStreamThreadCount.value = data.multipleStreamThreadCount || 6
+      originalMultipleStreamThreadCount.value = data.multipleStreamThreadCount || 6
+      // 后端返回的是字节，转换为KB
+      multipleStreamChunkSize.value = Math.round((data.multipleStreamChunkSize || 4194304) / 1024)
+      originalMultipleStreamChunkSize.value = Math.round((data.multipleStreamChunkSize || 4194304) / 1024)
     }
   } catch (error) {
     toast.error('获取设置失败')
@@ -339,10 +421,11 @@ const handleModifyName = async () => {
     toast.warning('网站名称不能为空')
     return
   }
-  
+
   try {
     loading.value = true
     await settingStore.modifyName(websiteName.value.trim())
+    originalWebsiteName.value = websiteName.value.trim()
     toast.success('网站名称修改成功')
   } catch (error) {
     console.error('修改网站名称失败:', error)
@@ -356,7 +439,7 @@ const handleModifyName = async () => {
 const handleToggleAuth = async () => {
   const currentAuth = settingStore.setting?.enableAuth
   const action = currentAuth ? '关闭' : '开启'
-  
+
   const confirmed = await confirmDialog({
     title: `${action}用户认证`,
     message: `确定要${action}用户认证功能吗？${currentAuth ? '关闭后任何人都可以访问WebDAV。' : '开启后访问WebDAV需要用户登录认证'}`,
@@ -364,11 +447,11 @@ const handleToggleAuth = async () => {
     cancelText: '取消',
     isDanger: false
   })
-  
+
   if (!confirmed) {
     return
   }
-  
+
   try {
     loading.value = true
     await settingStore.toggleAuth(!!currentAuth)
@@ -390,11 +473,11 @@ const handleRefreshKey = async () => {
     cancelText: '取消',
     isDanger: true
   })
-  
+
   if (!confirmed) {
     return
   }
-  
+
   try {
     loading.value = true
     await settingStore.refreshKey()
@@ -411,7 +494,7 @@ const handleRefreshKey = async () => {
 const handleToggleLocalProxy = async () => {
   const currentLocalProxy = settingStore.setting?.localProxy
   const action = currentLocalProxy ? '关闭' : '开启'
-  
+
   const confirmed = await confirmDialog({
     title: `${action}本地代理`,
     message: `确定要${action}本地代理功能吗？`,
@@ -419,11 +502,11 @@ const handleToggleLocalProxy = async () => {
     cancelText: '取消',
     isDanger: false
   })
-  
+
   if (!confirmed) {
     return
   }
-  
+
   try {
     loading.value = true
     await settingStore.toggleLocalProxy(!!currentLocalProxy)
@@ -440,7 +523,7 @@ const handleToggleLocalProxy = async () => {
 const handleToggleMultipleStream = async () => {
   const currentMultipleStream = settingStore.setting?.multipleStream
   const action = currentMultipleStream ? '关闭' : '开启'
-  
+
   const confirmed = await confirmDialog({
     title: `${action}多线程流式下载`,
     message: `确定要${action}多线程流式下载功能吗？`,
@@ -448,11 +531,11 @@ const handleToggleMultipleStream = async () => {
     cancelText: '取消',
     isDanger: false
   })
-  
+
   if (!confirmed) {
     return
   }
-  
+
   try {
     loading.value = true
     await settingStore.toggleMultipleStream(!!currentMultipleStream)
@@ -475,6 +558,7 @@ const handleModifyBaseURL = async () => {
   try {
     loading.value = true
     await settingStore.modifyBaseURL(baseURL.value.trim())
+    originalBaseURL.value = baseURL.value.trim()
     toast.success('基础URL修改成功')
   } catch (error) {
     console.error('修改基础URL失败:', error)
@@ -501,7 +585,7 @@ const handleModifyJobThreadCount = async () => {
     toast.warning('任务线程数必须在1-8之间')
     return
   }
-  
+
   try {
     loading.value = true
     await settingStore.modifyJobThreadCount(jobThreadCount.value)
@@ -526,7 +610,7 @@ const handleModifyAutoRefreshMinutes = async () => {
     toast.warning('自动刷新间隔必须在5-120分钟之间')
     return
   }
-  
+
   try {
     loading.value = true
     await settingStore.modifyAutoRefreshMinutes(autoRefreshMinutes.value)
@@ -540,11 +624,62 @@ const handleModifyAutoRefreshMinutes = async () => {
   }
 }
 
+// 新增：处理多线程流线程数变化
+const handleMultipleStreamThreadCountChange = () => {
+  // 实时更新显示值，但不保存
+}
+
+// 新增：修改多线程流线程数
+const handleModifyMultipleStreamThreadCount = async () => {
+  if (multipleStreamThreadCount.value < 1 || multipleStreamThreadCount.value > 64) {
+    toast.warning('多线程流线程数必须在1-64之间')
+    return
+  }
+
+  try {
+    loading.value = true
+    await settingStore.modifyMultipleStreamThreadCount(multipleStreamThreadCount.value)
+    originalMultipleStreamThreadCount.value = multipleStreamThreadCount.value
+    toast.success('多线程流线程数修改成功')
+  } catch (error) {
+    console.error('修改多线程流线程数失败:', error)
+    toast.error('修改多线程流线程数失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 新增：处理多线程流块大小变化
+const handleMultipleStreamChunkSizeChange = () => {
+  // 实时更新显示值，但不保存
+}
+
+// 新增：修改多线程流块大小
+const handleModifyMultipleStreamChunkSize = async () => {
+  if (multipleStreamChunkSize.value < 512 || multipleStreamChunkSize.value > 8192) {
+    toast.warning('多线程流块大小必须在512KB-8MB之间')
+    return
+  }
+
+  try {
+    loading.value = true
+    // 转换为字节发送给后端：KB * 1024
+    await settingStore.modifyMultipleStreamChunkSize(multipleStreamChunkSize.value * 1024)
+    originalMultipleStreamChunkSize.value = multipleStreamChunkSize.value
+    toast.success('多线程流块大小修改成功')
+  } catch (error) {
+    console.error('修改多线程流块大小失败:', error)
+    toast.error('修改多线程流块大小失败')
+  } finally {
+    loading.value = false
+  }
+}
+
 // 组件挂载时获取设置并启动定时器
 onMounted(async () => {
   // 初始获取数据
   await fetchSettingData()
-  
+
   // 每30秒刷新一次数据，让运行时间自动增长
   timer.value = setInterval(fetchSettingData, 30000)
 })
@@ -789,7 +924,7 @@ onUnmounted(() => {
   font-size: 0.875rem;
   font-weight: 600;
   color: #374151;
-  min-width: 20px;
+  min-width: 60px;
   text-align: center;
   padding: 0.25rem 0.5rem;
   background: #f3f4f6;

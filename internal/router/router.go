@@ -85,6 +85,8 @@ func StartHTTPServer() error {
 		settingRouter.POST("/toggle_enable_top_file_auto_refresh", settingService.ToggleEnableTopFileAutoRefresh())
 		settingRouter.POST("/modify_job_thread_count", settingService.ModifyJobThreadCount())
 		settingRouter.POST("/modify_auto_refresh_minutes", settingService.ModifyAutoRefreshMinutes())
+		settingRouter.POST("/modify_multiple_stream_thread_count", settingService.ModifyMultipleStreamThreadCount())
+		settingRouter.POST("/modify_multiple_stream_chunk_size", settingService.ModifyMultipleStreamChunkSize())
 
 		openapiRouter.POST("/setting/init_system", settingService.InitSystem())
 	}
