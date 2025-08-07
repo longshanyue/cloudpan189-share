@@ -23,6 +23,8 @@ type Service interface {
 	InitSystem() gin.HandlerFunc
 	ModifyJobThreadCount() gin.HandlerFunc
 	ModifyAutoRefreshMinutes() gin.HandlerFunc
+	ModifyMultipleStreamThreadCount() gin.HandlerFunc
+	ModifyMultipleStreamChunkSize() gin.HandlerFunc
 }
 
 type service struct {

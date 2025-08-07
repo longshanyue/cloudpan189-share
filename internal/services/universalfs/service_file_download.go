@@ -130,12 +130,21 @@ var globalHTTPClient = &http.Client{
 func (s *service) doResponse(ctx *gin.Context, url string) {
 	if shared.Setting.MultipleStream {
 		ctx.Header("X-Transfer-Type", "multi_stream")
+		ctx.Header("X-Transfer-Chunk-Size", strconv.FormatInt(shared.MultipleStreamChunkSize, 10))
+		ctx.Header("X-Transfer-Chunk-Size-Format", utils.FormatBytes(shared.MultipleStreamChunkSize))
+		ctx.Header("X-Transfer-Thread-Count", strconv.Itoa(shared.MultipleStreamThreadCount))
 
 		httpReq := ctx.Request.Header.Clone()
 		httpReq.Set("Accept-Encoding", "identity")
 		httpReq.Del("Content-Type")
 
-		streamer, err := multistreamer.NewStreamer(ctx, url, httpReq, multistreamer.WithLogger(s.logger))
+		streamer, err := multistreamer.NewStreamer(ctx,
+			url,
+			httpReq,
+			multistreamer.WithLogger(s.logger),
+			multistreamer.WithThreads(shared.MultipleStreamThreadCount),
+			multistreamer.WithChunkSize(shared.MultipleStreamChunkSize),
+		)
 		if err != nil {
 			s.logger.Error("初始化失败", zap.Error(err), zap.String("url", url))
 

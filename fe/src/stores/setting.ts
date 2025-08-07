@@ -137,6 +137,36 @@ export const useSettingStore = defineStore('setting', () => {
     }
   }
 
+  // 新增：修改多线程流线程数
+  const modifyMultipleStreamThreadCount = async (threadCount: number) => {
+    try {
+      await settingApi.modifyMultipleStreamThreadCount({
+        multipleStreamThreadCount: threadCount
+      })
+      if (setting.value) {
+        setting.value.multipleStreamThreadCount = threadCount
+      }
+    } catch (error) {
+      console.error('修改多线程流线程数失败:', error)
+      throw error
+    }
+  }
+
+  // 新增：修改多线程流块大小
+  const modifyMultipleStreamChunkSize = async (multipleStreamChunkSize: number) => {
+    try {
+      await settingApi.modifyMultipleStreamChunkSize({
+        multipleStreamChunkSize: multipleStreamChunkSize
+      })
+      if (setting.value) {
+        setting.value.multipleStreamChunkSize = multipleStreamChunkSize
+      }
+    } catch (error) {
+      console.error('修改多线程流块大小失败:', error)
+      throw error
+    }
+  }
+
   // 初始化系统
   const initSystem = async (data: InitSystemRequest) => {
     try {
@@ -162,6 +192,8 @@ export const useSettingStore = defineStore('setting', () => {
     toggleEnableTopFileAutoRefresh,
     modifyJobThreadCount,
     modifyAutoRefreshMinutes,
+    modifyMultipleStreamThreadCount,
+    modifyMultipleStreamChunkSize,
     initSystem
   }
 })
