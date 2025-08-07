@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
+	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"net/http"
 )
 
@@ -35,6 +36,8 @@ func (s *service) ModifyMultipleStreamThreadCount() gin.HandlerFunc {
 			})
 			return
 		}
+
+		shared.MultipleStreamThreadCount = req.MultipleStreamThreadCount
 
 		ctx.JSON(http.StatusOK, modifyMultipleStreamThreadCountResponse{
 			RowsAffected: result.RowsAffected,

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
+	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"net/http"
 )
 
@@ -37,6 +38,8 @@ func (s *service) ModifyMultipleStreamChunkSize() gin.HandlerFunc {
 
 			return
 		}
+
+		shared.MultipleStreamChunkSize = req.MultipleStreamChunkSize
 
 		ctx.JSON(http.StatusOK, modifyMultipleStreamChunkSizeResponse{
 			RowsAffected: result.RowsAffected,
