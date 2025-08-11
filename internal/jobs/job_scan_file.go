@@ -4,18 +4,23 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/bytedance/gopkg/util/gopool"
+	"github.com/google/uuid"
+	"github.com/samber/lo"
 	"github.com/xxcheng123/cloudpan189-interface/client"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
 	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"go.uber.org/zap"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type ScanFileJob struct {
@@ -87,13 +92,15 @@ func (s *ScanFileJob) doJob(ctx context.Context) bool {
 		_ = shared.RunningStat(msg.Msg.ID)
 		defer shared.FinishStat(msg.Msg.ID)
 		s.logger.Info("scan file job received message", zap.Any("msg", msg))
-		// 先检查文件还在不在
-		var count int64
-		s.db.WithContext(ctx).Model(new(models.VirtualFile)).Where("id = ?", msg.Msg.ID).Count(&count)
-		if count == 0 {
-			s.logger.Error("file not found", zap.Int64("file_id", msg.Msg.ID))
+		if msg.Msg.ID != 0 {
+			// 先检查文件还在不在
+			var count int64
+			s.db.WithContext(ctx).Model(new(models.VirtualFile)).Where("id = ?", msg.Msg.ID).Count(&count)
+			if count == 0 {
+				s.logger.Error("file not found", zap.Int64("file_id", msg.Msg.ID))
 
-			return true
+				return true
+			}
 		}
 
 		switch msg.Type {
@@ -108,6 +115,14 @@ func (s *ScanFileJob) doJob(ctx context.Context) bool {
 		case shared.ScanJobTypeDel:
 			if err := s.recursiveDelete(ctx, []*models.VirtualFile{msg.Msg}); err != nil {
 				s.logger.Error("delete file error", zap.Error(err))
+			}
+		case shared.ScanJobRebuildStrm:
+			if err := s.buildAllStrm(ctx); err != nil {
+				s.logger.Error("rebuild stream error", zap.Error(err))
+			}
+		case shared.ScanJobClearStream:
+			if err := s.clearAllStrm(ctx); err != nil {
+				s.logger.Error("clear stream error", zap.Error(err))
 			}
 		}
 	case <-time.After(refreshMinutes * time.Minute):
@@ -283,6 +298,21 @@ func (w *scanWorker) execute(ctx context.Context, f *models.VirtualFile, deep bo
 		if err = w.db.WithContext(ctx).CreateInBatches(filesToCreate, 100).Error; err != nil {
 			errs = append(errs, fmt.Errorf("failed to create files: %w", err))
 		}
+
+		if shared.StrmFileEnable {
+			strmFilesToCreate := make([]*models.VirtualFile, 0)
+			for _, file := range filesToCreate {
+				if strmFile, ok := getStrm(file); ok {
+					strmFilesToCreate = append(strmFilesToCreate, strmFile)
+				}
+			}
+
+			if len(strmFilesToCreate) > 0 {
+				if err = w.db.WithContext(ctx).CreateInBatches(strmFilesToCreate, 100).Error; err != nil {
+					errs = append(errs, fmt.Errorf("failed to create strm files: %w", err))
+				}
+			}
+		}
 	}
 
 	// 批量处理更新文件
@@ -445,6 +475,11 @@ func (s *ScanFileJob) recursiveDelete(ctx context.Context, files []*models.Virtu
 				}
 			}
 		}
+	}
+
+	// 删除关联的文件
+	if err := s.db.WithContext(ctx).Where("link_id IN ?", fileIDs).Delete(&models.VirtualFile{}).Error; err != nil {
+		errs = append(errs, fmt.Errorf("failed to delete files: %w", err))
 	}
 
 	// 删除当前层级的所有文件
@@ -902,4 +937,124 @@ func (s *ScanFileJob) getShareFiles(ctx context.Context, f *models.VirtualFile) 
 	}
 
 	return files, nil
+}
+
+func (s *ScanFileJob) buildStrm(ctx context.Context, f *models.VirtualFile) error {
+	if f.IsFolder != 1 {
+		return nil
+	}
+
+	subFiles := make([]*models.VirtualFile, 0)
+
+	if err := s.db.WithContext(ctx).Where("parent_id", f.ID).Find(&subFiles).Error; err != nil {
+		return err
+	}
+
+	strmFilesToCreate := make([]*models.VirtualFile, 0)
+
+	var errs []error
+
+	for _, subFile := range subFiles {
+		if strmFile, ok := getStrm(subFile); ok {
+			strmFilesToCreate = append(strmFilesToCreate, strmFile)
+		}
+
+		if subFile.IsFolder == 1 {
+			if err := s.buildStrm(ctx, subFile); err != nil {
+				s.logger.Error("failed to build strm for %s", zap.Error(err), zap.String("file_name", subFile.Name))
+
+				errs = append(errs, fmt.Errorf("failed to build strm for %s: %w", subFile.Name, err))
+			}
+		}
+	}
+
+	if len(strmFilesToCreate) > 0 {
+		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "parent_id"}, {Name: "name"}},
+			DoNothing: true, // 忽略重复数据
+		}).CreateInBatches(strmFilesToCreate, 100).Error; err != nil {
+			errs = append(errs, fmt.Errorf("failed to create strm files: %w", err))
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	return nil
+}
+
+func (s *ScanFileJob) buildAllStrm(ctx context.Context) error {
+	s.logger.Info("start build all strm")
+
+	if err := s.clearAllStrm(ctx); err != nil {
+		return err
+	}
+
+	// 读取所有顶层文件
+	var topFiles = make([]*models.VirtualFile, 0)
+	if err := s.db.WithContext(ctx).Where("is_top = 1").Find(&topFiles).Error; err != nil {
+		return err
+	}
+
+	var errs = make([]error, 0)
+
+	for _, f := range topFiles {
+		_ = shared.RunningStat(f.ID)
+		if err := s.buildStrm(ctx, f); err != nil {
+			errs = append(errs, err)
+		}
+		shared.FinishStat(f.ID)
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	return nil
+}
+
+func (s *ScanFileJob) clearAllStrm(ctx context.Context) error {
+	if err := s.db.WithContext(ctx).Where("os_type = ?", models.OsTypeStrmFile).Delete(&models.VirtualFile{}).Error; err != nil {
+		s.logger.Error("failed to delete strm files", zap.Error(err))
+
+		return err
+	}
+
+	return nil
+}
+
+func getStrm(f *models.VirtualFile) (*models.VirtualFile, bool) {
+	if f.IsFolder == 1 {
+		return nil, false
+	}
+
+	extName := strings.TrimPrefix(filepath.Ext(f.Name), ".")
+	if len(shared.StrmSupportFileExtList) > 0 && lo.IndexOf(shared.StrmSupportFileExtList, extName) == -1 {
+		return nil, false
+	}
+
+	now := time.Now()
+
+	// 计算 size
+	size := len(fmt.Sprintf("%s/api/file_download?id=%d&random=%s&sign=12345678123456781234567812345678&timestamp=-1", shared.Setting.BaseURL, f.ID, uuid.NewString()))
+
+	strmFile := &models.VirtualFile{
+		ParentId:   f.ParentId,
+		LinkId:     f.ID,
+		Name:       strings.TrimSuffix(f.Name, filepath.Ext(f.Name)) + ".strm",
+		IsTop:      f.IsTop,
+		Size:       int64(size),
+		IsFolder:   f.IsFolder,
+		Hash:       "-",
+		CreateDate: now.Format(time.DateTime),
+		ModifyDate: now.Format(time.DateTime),
+		OsType:     models.OsTypeStrmFile,
+		Addition:   make(datatypes.JSONMap),
+		Rev:        now.Format("20060102150405"),
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+
+	return strmFile, true
 }

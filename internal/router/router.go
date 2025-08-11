@@ -2,10 +2,11 @@ package router
 
 import (
 	"fmt"
-	"github.com/xxcheng123/cloudpan189-share/internal/services/usergroup"
 	"io/fs"
 	"net/http"
 	"strings"
+
+	"github.com/xxcheng123/cloudpan189-share/internal/services/usergroup"
 
 	"github.com/gin-gonic/gin"
 	embed "github.com/xxcheng123/cloudpan189-share"
@@ -108,6 +109,9 @@ func StartHTTPServer() error {
 		for _, method := range davMethods {
 			engine.Handle(method, "/dav/*path", userService.BasicAuthMiddleware(models.PermissionDavRead), universalFsService.DavMiddleware(), universalFsService.Open("/dav", "dav"))
 			engine.Handle(method, "/dav", userService.BasicAuthMiddleware(models.PermissionDavRead), universalFsService.DavMiddleware(), universalFsService.Open("/dav", "dav"))
+
+			engine.Handle(method, "/strm_dav/*path", userService.BasicAuthMiddleware(models.PermissionDavRead), universalFsService.DavMiddleware(), universalFsService.Open("/strm_dav", "strm_dav"))
+			engine.Handle(method, "/strm_dav", userService.BasicAuthMiddleware(models.PermissionDavRead), universalFsService.DavMiddleware(), universalFsService.Open("/strm_dav", "strm_dav"))
 		}
 		openapiRouter.GET("/file_download", universalFsService.FileDownload())
 	}

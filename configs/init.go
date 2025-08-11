@@ -122,6 +122,10 @@ func Init() {
 			shared.MultipleStreamThreadCount = dict.Value.Int()
 		case models.SettingDictKeyMultipleStreamChunkSize:
 			shared.MultipleStreamChunkSize = dict.Value.Int64()
+		case models.SettingDictKeyStrmFileEnable:
+			shared.StrmFileEnable = dict.Value.Bool()
+		case models.SettingDictKeyStrmSupportFileExtList:
+			shared.StrmSupportFileExtList = dict.Value.StringSlice()
 		}
 	}
 

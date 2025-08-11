@@ -3,6 +3,9 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/samber/lo"
 	"github.com/tickstep/cloudpan189-api/cloudpan"
@@ -10,8 +13,6 @@ import (
 	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"sync"
-	"time"
 )
 
 type AutoLoginJob struct {

@@ -1,6 +1,7 @@
 logs
 output
 data/share.db
+data
 session.json
 .idea
 .vscode

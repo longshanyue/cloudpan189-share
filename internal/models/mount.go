@@ -12,11 +12,14 @@ const (
 	OsTypeSubscribe      = "subscribe"
 	OsTypeSubscribeShare = "subscribe_share"
 	OsTypeShare          = "share"
+	OsTypeRealFile       = "real_file"
+	OsTypeStrmFile       = "strm_file"
 )
 
 type VirtualFile struct {
 	ID         int64             `gorm:"primaryKey" json:"id"`
 	ParentId   int64             `gorm:"column:parent_id;type:bigint(20);not null;default:0;uniqueIndex:parent_name_unique" json:"parentId"`
+	LinkId     int64             `gorm:"column:link_id;type:bigint(20);default:0;index:link_id_index" json:"linkId"` // 关联id，用于strm文件，当文件被删除后，实现关联的 strm 文件快速删除
 	Name       string            `gorm:"column:name;type:varchar(1024);not null;uniqueIndex:parent_name_unique" json:"name"`
 	IsTop      int8              `gorm:"column:is_top;type:tinyint(1);default:0" json:"isTop"` // 是否最顶层文件夹
 	Size       int64             `gorm:"column:size;type:bigint(20);default:0" json:"size"`

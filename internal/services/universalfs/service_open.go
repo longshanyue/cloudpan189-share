@@ -4,14 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/samber/lo"
-	"go.uber.org/zap"
 	"net/http"
 	"net/url"
 	"path"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/samber/lo"
+	"go.uber.org/zap"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/gin-gonic/gin"
@@ -22,12 +23,26 @@ import (
 	"gorm.io/gorm"
 )
 
+type openRequest struct {
+	IncludeAutoGenerateStrmFile bool `form:"includeAutoGenerateStrmFile"`
+}
+
 func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		rawPath := ctx.Param("path")
 
 		paths, err := utils.SplitPath(rawPath)
 		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"code":    http.StatusBadRequest,
+				"message": err.Error(),
+			})
+
+			return
+		}
+
+		req := new(openRequest)
+		if err = ctx.ShouldBindQuery(req); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"code":    http.StatusBadRequest,
 				"message": err.Error(),
@@ -155,6 +170,41 @@ func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 				})
 			}
 
+			// 处理 strm 的过滤问题
+			switch format {
+			case "dav":
+				f.Children = lo.Filter(f.Children, func(item *FileInfo, _ int) bool {
+					if item.OsType == models.OsTypeStrmFile {
+						return false
+					}
+
+					return true
+				})
+			case "strm_dav":
+				var linkIds = make([]int64, 0)
+				for _, item := range f.Children {
+					if item.OsType == models.OsTypeStrmFile {
+						linkIds = append(linkIds, item.LinkId)
+					}
+				}
+
+				f.Children = lo.Filter(f.Children, func(item *FileInfo, _ int) bool {
+					if lo.IndexOf(linkIds, item.ID) > -1 {
+						return false
+					}
+
+					return true
+				})
+			case "json":
+				f.Children = lo.Filter(f.Children, func(item *FileInfo, _ int) bool {
+					if !req.IncludeAutoGenerateStrmFile && item.OsType == models.OsTypeStrmFile {
+						return false
+					}
+
+					return true
+				})
+			}
+
 			sort.Slice(f.Children, func(i, j int) bool {
 				if f.Children[i].IsFolder != f.Children[j].IsFolder {
 					return f.Children[i].IsFolder > f.Children[j].IsFolder
@@ -163,21 +213,7 @@ func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 				return f.Children[i].Rev > f.Children[j].Rev
 			})
 		} else {
-			values := enc(url.Values{
-				"id":     []string{fmt.Sprintf("%d", file.ID)},
-				"random": []string{uuid.NewString()},
-			}, shared.Setting.SaltKey)
-
-			baseURL := shared.Setting.BaseURL
-			if baseURL == "" {
-				scheme := "http"
-				if ctx.Request.TLS != nil {
-					scheme = "https"
-				}
-				baseURL = fmt.Sprintf("%s://%s", scheme, ctx.Request.Host)
-			}
-
-			f.DownloadURL = fmt.Sprintf("%s/api/file_download?%s", baseURL, values.Encode())
+			f.DownloadURL = s.generateDownloadURL(file.ID)
 		}
 
 		switch format {
@@ -187,4 +223,27 @@ func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 			ctx.JSON(http.StatusOK, f)
 		}
 	}
+}
+
+func (s *service) generateDownloadURL(fid int64) string {
+	values := enc(url.Values{
+		"id":     []string{fmt.Sprintf("%d", fid)},
+		"random": []string{uuid.NewString()},
+	}, shared.Setting.SaltKey)
+
+	baseURL := shared.Setting.BaseURL
+
+	return fmt.Sprintf("%s/api/file_download?%s", baseURL, values.Encode())
+}
+
+func (s *service) generateDownloadURLWithNeverExpire(fid int64) string {
+	values := enc(url.Values{
+		"id":        []string{fmt.Sprintf("%d", fid)},
+		"random":    []string{uuid.NewString()},
+		"timestamp": []string{"-1"},
+	}, shared.Setting.SaltKey)
+
+	baseURL := shared.Setting.BaseURL
+
+	return fmt.Sprintf("%s/api/file_download?%s", baseURL, values.Encode())
 }

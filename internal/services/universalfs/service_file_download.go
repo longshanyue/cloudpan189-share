@@ -41,7 +41,7 @@ func (s *service) FileDownload() gin.HandlerFunc {
 			return
 		}
 
-		if req.TimeStamp < time.Now().Unix() {
+		if req.TimeStamp != -1 && req.TimeStamp < time.Now().Unix() {
 			ctx.JSON(http.StatusUnauthorized, gin.H{
 				"code":    http.StatusUnauthorized,
 				"message": "timeStamp is expired",
@@ -78,8 +78,9 @@ func (s *service) FileDownload() gin.HandlerFunc {
 
 		_result, err, _ := s.g.Do(fmt.Sprintf("file::url::%d", req.ID), func() (interface{}, error) {
 			u, httpCode, err := s.getFileDownloadURL(ctx, req.ID)
+
 			return &DoResult{
-				URL:      u,
+				Content:  u,
 				HttpCode: httpCode,
 				Err:      err,
 			}, nil
@@ -105,7 +106,13 @@ func (s *service) FileDownload() gin.HandlerFunc {
 			return
 		}
 
-		s.doResponse(ctx, result.URL)
+		if result.HttpCode == http.StatusOK {
+			ctx.String(http.StatusOK, result.Content)
+
+			return
+		}
+
+		s.doResponse(ctx, result.Content)
 	}
 }
 
@@ -446,7 +453,7 @@ func (s *service) ConnectionMonitorMiddleware() gin.HandlerFunc {
 }
 
 type DoResult struct {
-	URL      string
+	Content  string
 	HttpCode int
 	Err      error
 }
@@ -459,6 +466,10 @@ func (s *service) getFileDownloadURL(ctx context.Context, id int64) (string, int
 		}
 
 		return "", http.StatusInternalServerError, err
+	}
+
+	if file.OsType == models.OsTypeStrmFile {
+		return s.generateDownloadURLWithNeverExpire(file.LinkId), http.StatusOK, nil
 	}
 
 	var cloudTokenId int64
