@@ -218,6 +218,7 @@ func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 
 		switch format {
 		case "dav":
+		case "strm_dav":
 			s.responseDav(ctx, f)
 		default:
 			ctx.JSON(http.StatusOK, f)

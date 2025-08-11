@@ -3,143 +3,143 @@
     <!-- 系统设置主卡片 -->
     <PageCard title="系统设置" subtitle="管理系统配置和参数设置">
       <SectionDivider />
-      
+
       <SubsectionTitle title="基本设置" />
-        <div class="setting-item">
-          <div class="setting-label">
-            <span class="label-text">网站名称</span>
-            <span class="label-desc">设置网站的显示名称</span>
-          </div>
-          <div class="setting-control">
-            <input 
-              v-model="websiteName" 
-              type="text" 
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">网站名称</span>
+          <span class="label-desc">设置网站的显示名称</span>
+        </div>
+        <div class="setting-control">
+          <input
+              v-model="websiteName"
+              type="text"
               class="setting-input"
               placeholder="请输入网站名称"
               :disabled="loading"
-            >
-            <button 
-              @click="handleModifyName" 
+          >
+          <button
+              @click="handleModifyName"
               class="btn btn-primary btn-sm"
               :disabled="loading || !websiteName.trim() || websiteName === originalWebsiteName"
-            >
-              {{ loading ? '保存中...' : '保存' }}
-            </button>
-          </div>
+          >
+            {{ loading ? '保存中...' : '保存' }}
+          </button>
         </div>
+      </div>
 
-        <div class="setting-item">
-          <div class="setting-label">
-            <span class="label-text">基础URL</span>
-            <span class="label-desc">设置系统访问的基础URL，用于生成分享链接等</span>
-          </div>
-          <div class="setting-control">
-            <input 
-              v-model="baseURL" 
-              type="text" 
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">基础URL</span>
+          <span class="label-desc">设置系统访问的基础URL，用于生成分享链接等</span>
+        </div>
+        <div class="setting-control">
+          <input
+              v-model="baseURL"
+              type="text"
               class="setting-input"
               placeholder="请输入基础URL"
               :disabled="loading"
-            >
-            <button 
-              @click="handleAutoFillBaseURL" 
+          >
+          <button
+              @click="handleAutoFillBaseURL"
               class="btn btn-secondary btn-sm"
               :disabled="loading"
-            >
-              自动获取
-            </button>
-            <button 
-              @click="handleModifyBaseURL" 
+          >
+            自动获取
+          </button>
+          <button
+              @click="handleModifyBaseURL"
               class="btn btn-primary btn-sm"
               :disabled="loading || !baseURL.trim() || baseURL === originalBaseURL"
+          >
+            {{ loading ? '保存中...' : '保存' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">系统运行时间</span>
+          <span class="label-desc">当前系统已运行时间</span>
+        </div>
+        <div class="setting-value">{{ formatRunTime(settingStore.setting?.runTimes || 0) }}</div>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">更新时间</span>
+          <span class="label-desc">配置上一次更新的时间</span>
+        </div>
+        <div class="setting-value">{{ formatDate(settingStore.setting?.updatedAt) }}</div>
+      </div>
+
+      <SectionDivider />
+
+      <SubsectionTitle title="功能设置" />
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">用户认证</span>
+          <span class="label-desc">开启后访问WebDAV需要用户登录认证</span>
+        </div>
+        <div class="setting-control">
+          <div class="custom-switch" @click="handleToggleAuth">
+            <input
+                type="checkbox"
+                :checked="settingStore.setting?.enableAuth"
+                :disabled="loading"
+                class="switch-input"
             >
-              {{ loading ? '保存中...' : '保存' }}
-            </button>
+            <span class="switch-slider"></span>
           </div>
         </div>
-        
-        <div class="setting-item">
-          <div class="setting-label">
-            <span class="label-text">系统运行时间</span>
-            <span class="label-desc">当前系统已运行时间</span>
-          </div>
-          <div class="setting-value">{{ formatRunTime(settingStore.setting?.runTimes || 0) }}</div>
-        </div>
+      </div>
 
-        <div class="setting-item">
-          <div class="setting-label">
-            <span class="label-text">更新时间</span>
-            <span class="label-desc">配置上一次更新的时间</span>
-          </div>
-          <div class="setting-value">{{ formatDate(settingStore.setting?.updatedAt) }}</div>
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">本地代理</span>
+          <span class="label-desc">系统默认通过302跳转方式提供资源，开启后服务器代为获取资源再转发给用户</span>
         </div>
-        
-        <SectionDivider />
-        
-        <SubsectionTitle title="功能设置" />
-        <div class="setting-item">
-            <div class="setting-label">
-              <span class="label-text">用户认证</span>
-              <span class="label-desc">开启后访问WebDAV需要用户登录认证</span>
-            </div>
-          <div class="setting-control">
-            <div class="custom-switch" @click="handleToggleAuth">
-              <input 
-                type="checkbox" 
-                :checked="settingStore.setting?.enableAuth" 
+        <div class="setting-control">
+          <div class="custom-switch" @click="handleToggleLocalProxy">
+            <input
+                type="checkbox"
+                :checked="settingStore.setting?.localProxy"
                 :disabled="loading"
                 class="switch-input"
-              >
-              <span class="switch-slider"></span>
-            </div>
+            >
+            <span class="switch-slider"></span>
           </div>
         </div>
-        
-        <div class="setting-item">
-          <div class="setting-label">
-            <span class="label-text">本地代理</span>
-            <span class="label-desc">系统默认通过302跳转方式提供资源，开启后服务器代为获取资源再转发给用户</span>
-          </div>
-          <div class="setting-control">
-            <div class="custom-switch" @click="handleToggleLocalProxy">
-              <input 
-                type="checkbox" 
-                :checked="settingStore.setting?.localProxy" 
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">多线程流式下载</span>
+          <span class="label-desc">使用多个连接并发下载视频片段，提升下载速度和播放流畅度，优先级高于本地代理设置</span>
+        </div>
+        <div class="setting-control">
+          <div class="custom-switch" @click="handleToggleMultipleStream">
+            <input
+                type="checkbox"
+                :checked="settingStore.setting?.multipleStream"
                 :disabled="loading"
                 class="switch-input"
-              >
-              <span class="switch-slider"></span>
-            </div>
+            >
+            <span class="switch-slider"></span>
           </div>
         </div>
+      </div>
 
-        <div class="setting-item">
-          <div class="setting-label">
-            <span class="label-text">多线程流式下载</span>
-            <span class="label-desc">使用多个连接并发下载视频片段，提升下载速度和播放流畅度，优先级高于本地代理设置</span>
-          </div>
-          <div class="setting-control">
-            <div class="custom-switch" @click="handleToggleMultipleStream">
-              <input 
-                type="checkbox" 
-                :checked="settingStore.setting?.multipleStream" 
-                :disabled="loading"
-                class="switch-input"
-              >
-              <span class="switch-slider"></span>
-            </div>
-          </div>
+      <!-- 多线程流线程数设置 -->
+      <div class="setting-item" v-if="settingStore.setting?.multipleStream">
+        <div class="setting-label">
+          <span class="label-text">多线程流线程数</span>
+          <span class="label-desc">设置多线程流式下载的并发线程数，范围：1-64，太多的线程数可能会导致加载时间过长甚至程序崩溃</span>
         </div>
-
-        <!-- 多线程流线程数设置 -->
-        <div class="setting-item" v-if="settingStore.setting?.multipleStream">
-          <div class="setting-label">
-            <span class="label-text">多线程流线程数</span>
-            <span class="label-desc">设置多线程流式下载的并发线程数，范围：1-64，太多的线程数可能会导致加载时间过长甚至程序崩溃</span>
-          </div>
-          <div class="setting-control">
-            <div class="thread-count-control">
-              <input
+        <div class="setting-control">
+          <div class="thread-count-control">
+            <input
                 v-model.number="multipleStreamThreadCount"
                 type="range"
                 min="1"
@@ -148,28 +148,28 @@
                 class="thread-slider"
                 :disabled="loading"
                 @input="handleMultipleStreamThreadCountChange"
-              >
-              <span class="thread-count-value">{{ multipleStreamThreadCount }}</span>
-            </div>
-            <button
+            >
+            <span class="thread-count-value">{{ multipleStreamThreadCount }}</span>
+          </div>
+          <button
               @click="handleModifyMultipleStreamThreadCount"
               class="btn btn-primary btn-sm"
               :disabled="loading || multipleStreamThreadCount === originalMultipleStreamThreadCount"
-            >
-              {{ loading ? '保存中...' : '保存' }}
-            </button>
-          </div>
+          >
+            {{ loading ? '保存中...' : '保存' }}
+          </button>
         </div>
+      </div>
 
-        <!-- 多线程流块大小设置 -->
-        <div class="setting-item" v-if="settingStore.setting?.multipleStream">
-          <div class="setting-label">
-            <span class="label-text">多线程流块大小</span>
-            <span class="label-desc">设置每个下载块的大小，范围：512KB-8MB，较大的块大小可能提升性能但会增加内存使用</span>
-          </div>
-          <div class="setting-control">
-            <div class="thread-count-control">
-              <input
+      <!-- 多线程流块大小设置 -->
+      <div class="setting-item" v-if="settingStore.setting?.multipleStream">
+        <div class="setting-label">
+          <span class="label-text">多线程流块大小</span>
+          <span class="label-desc">设置每个下载块的大小，范围：512KB-8MB，较大的块大小可能提升性能但会增加内存使用</span>
+        </div>
+        <div class="setting-control">
+          <div class="thread-count-control">
+            <input
                 v-model.number="multipleStreamChunkSize"
                 type="range"
                 min="512"
@@ -178,45 +178,45 @@
                 class="thread-slider"
                 :disabled="loading"
                 @input="handleMultipleStreamChunkSizeChange"
-              >
-              <span class="thread-count-value">{{ formatChunkSize(multipleStreamChunkSize) }}</span>
-            </div>
-            <button
+            >
+            <span class="thread-count-value">{{ formatChunkSize(multipleStreamChunkSize) }}</span>
+          </div>
+          <button
               @click="handleModifyMultipleStreamChunkSize"
               class="btn btn-primary btn-sm"
               :disabled="loading || multipleStreamChunkSize === originalMultipleStreamChunkSize"
-            >
-              {{ loading ? '保存中...' : '保存' }}
-            </button>
-          </div>
+          >
+            {{ loading ? '保存中...' : '保存' }}
+          </button>
         </div>
+      </div>
 
-        <div class="setting-item">
-          <div class="setting-label">
-            <span class="label-text">挂载文件自动刷新</span>
-            <span class="label-desc">开启后，系统将自动刷新挂载的文件列表，此功能不能保证文件列表的实时性，可在前台文件浏览页面使用<b>刷新索引</b>功能手动刷新</span>
-          </div>
-          <div class="setting-control">
-            <div class="custom-switch" @click="handleToggleEnableTopFileAutoRefresh">
-              <input
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">挂载文件自动刷新</span>
+          <span class="label-desc">开启后，系统将自动刷新挂载的文件列表，此功能不能保证文件列表的实时性，可在前台文件浏览页面使用<b>刷新索引</b>功能手动刷新</span>
+        </div>
+        <div class="setting-control">
+          <div class="custom-switch" @click="handleToggleEnableTopFileAutoRefresh">
+            <input
                 type="checkbox"
                 :checked="settingStore.setting?.enableTopFileAutoRefresh"
                 :disabled="loading"
                 class="switch-input"
-              >
-              <span class="switch-slider"></span>
-            </div>
+            >
+            <span class="switch-slider"></span>
           </div>
         </div>
+      </div>
 
-        <div class="setting-item">
-          <div class="setting-label">
-            <span class="label-text">自动刷新间隔</span>
-            <span class="label-desc">设置挂载文件自动刷新的时间间隔，范围：5-120分钟</span>
-          </div>
-          <div class="setting-control">
-            <div class="thread-count-control">
-              <input
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">自动刷新间隔</span>
+          <span class="label-desc">设置挂载文件自动刷新的时间间隔，范围：5-120分钟</span>
+        </div>
+        <div class="setting-control">
+          <div class="thread-count-control">
+            <input
                 v-model.number="autoRefreshMinutes"
                 type="range"
                 min="5"
@@ -225,27 +225,27 @@
                 class="thread-slider"
                 :disabled="loading"
                 @input="handleAutoRefreshMinutesChange"
-              >
-              <span class="thread-count-value">{{ autoRefreshMinutes }}分钟</span>
-            </div>
-            <button
+            >
+            <span class="thread-count-value">{{ autoRefreshMinutes }}分钟</span>
+          </div>
+          <button
               @click="handleModifyAutoRefreshMinutes"
               class="btn btn-primary btn-sm"
               :disabled="loading || autoRefreshMinutes === originalAutoRefreshMinutes"
-            >
-              {{ loading ? '保存中...' : '保存' }}
-            </button>
-          </div>
+          >
+            {{ loading ? '保存中...' : '保存' }}
+          </button>
         </div>
+      </div>
 
-        <div class="setting-item">
-          <div class="setting-label">
-            <span class="label-text">任务线程数</span>
-            <span class="label-desc">当添加挂载文件或刷新扫描文件时，最大的并发线程数，为了保证服务可靠性，目前最大值为8（任务执行还是单任务按序执行，只是对某个任务的执行速度加快了）</span>
-          </div>
-          <div class="setting-control">
-            <div class="thread-count-control">
-              <input
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">任务线程数</span>
+          <span class="label-desc">当添加挂载文件或刷新扫描文件时，最大的并发线程数，为了保证服务可靠性，目前最大值为8（任务执行还是单任务按序执行，只是对某个任务的执行速度加快了）</span>
+        </div>
+        <div class="setting-control">
+          <div class="thread-count-control">
+            <input
                 v-model.number="jobThreadCount"
                 type="range"
                 min="1"
@@ -254,37 +254,150 @@
                 class="thread-slider"
                 :disabled="loading"
                 @input="handleThreadCountChange"
-              >
-              <span class="thread-count-value">{{ jobThreadCount }}</span>
-            </div>
-            <button
+            >
+            <span class="thread-count-value">{{ jobThreadCount }}</span>
+          </div>
+          <button
               @click="handleModifyJobThreadCount"
               class="btn btn-primary btn-sm"
               :disabled="loading || jobThreadCount === originalJobThreadCount"
-            >
-              {{ loading ? '保存中...' : '保存' }}
-            </button>
-          </div>
+          >
+            {{ loading ? '保存中...' : '保存' }}
+          </button>
         </div>
+      </div>
 
-        <div class="setting-item">
-          <div class="setting-label">
-            <span class="label-text">API密钥</span>
-            <span class="label-desc">刷新后所有已登录账号都将重新登录系统（包括当前账号）</span>
+      <!-- 新增：STRM文件生成设置 -->
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">STRM文件生成</span>
+          <span class="label-desc">开启后系统将为支持的视频文件生成STRM文件，用于媒体服务器播放。关闭时会清空已有的STRM文件</span>
+        </div>
+        <div class="setting-control">
+          <div class="custom-switch" @click="handleToggleStrmFileEnable">
+            <input
+                type="checkbox"
+                :checked="settingStore.setting?.strmFileEnable"
+                :disabled="loading"
+                class="switch-input"
+            >
+            <span class="switch-slider"></span>
           </div>
-          <div class="setting-control">
-            <button
+          <button
+              v-if="settingStore.setting?.strmFileEnable"
+              @click="handleRebuildStrmFiles"
+              class="btn btn-danger btn-sm"
+              :disabled="loading"
+          >
+            {{ loading ? '重建中...' : '重建STRM文件' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- STRM支持文件格式设置 - 移除条件判断，始终显示 -->
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">STRM支持文件格式</span>
+          <span class="label-desc">设置哪些文件格式会生成STRM文件，支持常见的视频格式。无论是否开启STRM功能都可以预先配置</span>
+        </div>
+        <div class="setting-control">
+          <div class="strm-ext-display">
+            <span v-if="strmSupportFileExtList.length === 0" class="no-ext-text">暂无设置任何格式（支持所有格式）</span>
+            <span v-else class="ext-count">已设置 {{ strmSupportFileExtList.length }} 种格式</span>
+            <div v-if="strmSupportFileExtList.length > 0" class="ext-preview">
+              {{ strmSupportFileExtList.slice(0, 5).join(', ') }}
+              <span v-if="strmSupportFileExtList.length > 5">...</span>
+            </div>
+          </div>
+          <button
+              @click="openStrmExtModal"
+              class="btn btn-primary btn-sm"
+              :disabled="loading"
+          >
+            编辑格式
+          </button>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">API密钥</span>
+          <span class="label-desc">刷新后所有已登录账号都将重新登录系统（包括当前账号）</span>
+        </div>
+        <div class="setting-control">
+          <button
               @click="handleRefreshKey"
               class="btn btn-danger btn-sm"
               :disabled="loading"
-            >
-              {{ loading ? '刷新中...' : '刷新密钥' }}
-            </button>
+          >
+            {{ loading ? '刷新中...' : '刷新密钥' }}
+          </button>
+        </div>
+      </div>
+
+      <SectionDivider />
+    </PageCard>
+
+    <!-- STRM文件格式编辑弹窗 -->
+    <div v-if="showStrmExtModal" class="modal-overlay" @click="closeStrmExtModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3 class="modal-title">编辑STRM支持文件格式</h3>
+          <button @click="closeStrmExtModal" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="ext-editor">
+            <div class="ext-input-section">
+              <label class="ext-label">添加新格式（不包含点号）:</label>
+              <div class="ext-input-group">
+                <input
+                    v-model="newExtension"
+                    type="text"
+                    placeholder="例如: mp4"
+                    class="ext-input"
+                    @keyup.enter="addExtension"
+                    maxlength="10"
+                >
+                <button @click="addExtension" class="btn btn-primary btn-sm" :disabled="!newExtension.trim()">
+                  添加
+                </button>
+              </div>
+            </div>
+
+            <div class="ext-list-section">
+              <div class="ext-list-header">
+                <label class="ext-label">当前支持的格式:</label>
+                <div class="ext-actions">
+                  <button @click="selectAllExtensions" class="btn btn-secondary btn-xs">全选</button>
+                  <button @click="clearAllExtensions" class="btn btn-secondary btn-xs">清空</button>
+                  <button @click="resetToDefaultExtensions" class="btn btn-secondary btn-xs">恢复默认</button>
+                </div>
+              </div>
+
+              <div class="ext-tags">
+                <div
+                    v-for="(ext, index) in tempStrmSupportFileExtList"
+                    :key="index"
+                    class="ext-tag"
+                >
+                  <span class="ext-name">{{ ext }}</span>
+                  <button @click="removeExtension(index)" class="ext-remove">×</button>
+                </div>
+                <div v-if="tempStrmSupportFileExtList.length === 0" class="no-ext-message">
+                  暂无设置任何格式（支持所有格式）
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-
-        <SectionDivider />
-    </PageCard>
+        <div class="modal-footer">
+          <button @click="closeStrmExtModal" class="btn btn-secondary">取消</button>
+          <button @click="saveStrmExtensions" class="btn btn-primary" :disabled="modalLoading">
+            {{ modalLoading ? '保存中...' : '保存' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </Layout>
 </template>
 
@@ -311,11 +424,29 @@ const originalJobThreadCount = ref(1) // 用于存储原始任务线程数
 const autoRefreshMinutes = ref(10)
 const originalAutoRefreshMinutes = ref(10) // 用于存储原始自动刷新间隔
 
-// 新增：多线程流相关参数
+// 多线程流相关参数
 const multipleStreamThreadCount = ref(6)
 const originalMultipleStreamThreadCount = ref(6) // 用于存储原始多线程流线程数
 const multipleStreamChunkSize = ref(4096) // 默认4MB，以KB为单位
 const originalMultipleStreamChunkSize = ref(4096) // 用于存储原始多线程流块大小
+
+// 新增：STRM相关参数
+const strmSupportFileExtList = ref<string[]>([])
+
+// 新增：STRM文件格式编辑弹窗相关
+const showStrmExtModal = ref(false)
+const modalLoading = ref(false)
+const tempStrmSupportFileExtList = ref<string[]>([])
+const newExtension = ref('')
+
+// 默认的文件扩展名列表
+const DEFAULT_EXTENSIONS = [
+  'mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v',
+  'mpg', 'mpeg', 'm2v', 'm4p', 'm4b', 'ts', 'mts', 'm2ts', 'm2t',
+  'mxf', 'dv', 'dvr-ms', 'asf', '3gp', '3g2', 'f4v', 'f4p', 'f4a', 'f4b',
+  'vob', 'ogv', 'ogg', 'divx', 'xvid', 'rm', 'rmvb', 'dat', 'nsv',
+  'qt', 'amv', 'mpv', 'm1v', 'svi', 'viv', 'fli', 'flc'
+]
 
 // 定时器引用
 const timer = ref<NodeJS.Timeout | null>(null)
@@ -360,7 +491,7 @@ const formatDate = (dateString?: string): string => {
   }
 }
 
-// 新增：格式化块大小显示
+// 格式化块大小显示
 const formatChunkSize = (sizeKB: number): string => {
   if (sizeKB >= 1024) {
     const sizeMB = sizeKB / 1024
@@ -384,12 +515,15 @@ const fetchSettingData = async () => {
       autoRefreshMinutes.value = data.autoRefreshMinutes || 10
       originalAutoRefreshMinutes.value = data.autoRefreshMinutes || 10
 
-      // 新增：设置多线程流相关参数
+      // 设置多线程流相关参数
       multipleStreamThreadCount.value = data.multipleStreamThreadCount || 6
       originalMultipleStreamThreadCount.value = data.multipleStreamThreadCount || 6
       // 后端返回的是字节，转换为KB
       multipleStreamChunkSize.value = Math.round((data.multipleStreamChunkSize || 4194304) / 1024)
       originalMultipleStreamChunkSize.value = Math.round((data.multipleStreamChunkSize || 4194304) / 1024)
+
+      // 新增：设置STRM相关参数
+      strmSupportFileExtList.value = data.strmSupportFileExtList || []
     }
   } catch (error) {
     toast.error('获取设置失败')
@@ -624,12 +758,12 @@ const handleModifyAutoRefreshMinutes = async () => {
   }
 }
 
-// 新增：处理多线程流线程数变化
+// 处理多线程流线程数变化
 const handleMultipleStreamThreadCountChange = () => {
   // 实时更新显示值，但不保存
 }
 
-// 新增：修改多线程流线程数
+// 修改多线程流线程数
 const handleModifyMultipleStreamThreadCount = async () => {
   if (multipleStreamThreadCount.value < 1 || multipleStreamThreadCount.value > 64) {
     toast.warning('多线程流线程数必须在1-64之间')
@@ -649,12 +783,12 @@ const handleModifyMultipleStreamThreadCount = async () => {
   }
 }
 
-// 新增：处理多线程流块大小变化
+// 处理多线程流块大小变化
 const handleMultipleStreamChunkSizeChange = () => {
   // 实时更新显示值，但不保存
 }
 
-// 新增：修改多线程流块大小
+// 修改多线程流块大小
 const handleModifyMultipleStreamChunkSize = async () => {
   if (multipleStreamChunkSize.value < 512 || multipleStreamChunkSize.value > 8192) {
     toast.warning('多线程流块大小必须在512KB-8MB之间')
@@ -675,6 +809,143 @@ const handleModifyMultipleStreamChunkSize = async () => {
   }
 }
 
+// 新增：切换STRM文件生成
+const handleToggleStrmFileEnable = async () => {
+  const currentStrmFileEnable = settingStore.setting?.strmFileEnable
+  const action = currentStrmFileEnable ? '关闭' : '开启'
+
+  const confirmed = await confirmDialog({
+    title: `${action}STRM文件生成`,
+    message: `确定要${action}STRM文件生成功能吗？${currentStrmFileEnable ? '关闭后会清空所有已生成的STRM文件。' : '开启后系统将为支持的视频文件生成STRM文件。'}`,
+    confirmText: '确认',
+    cancelText: '取消',
+    isDanger: currentStrmFileEnable
+  })
+
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    loading.value = true
+    await settingStore.toggleStrmFileEnable(!currentStrmFileEnable)
+    toast.success(`STRM文件生成已${action}`)
+  } catch (error) {
+    console.error('切换STRM文件生成失败:', error)
+    toast.error('切换STRM文件生成失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 新增：重建STRM文件
+const handleRebuildStrmFiles = async () => {
+  const confirmed = await confirmDialog({
+    title: '重建STRM文件',
+    message: '确定要重建所有STRM文件吗？这将删除现有的STRM文件并重新生成。',
+    confirmText: '确认',
+    cancelText: '取消',
+    isDanger: true
+  })
+
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    loading.value = true
+    // 传入true表示重建
+    await settingStore.toggleStrmFileEnable(true)
+    toast.success('STRM文件重建已开始')
+  } catch (error) {
+    console.error('重建STRM文件失败:', error)
+    toast.error('重建STRM文件失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 新增：打开STRM文件格式编辑弹窗
+const openStrmExtModal = () => {
+  tempStrmSupportFileExtList.value = [...strmSupportFileExtList.value]
+  newExtension.value = ''
+  showStrmExtModal.value = true
+  // 阻止页面滚动
+  document.body.style.overflow = 'hidden'
+}
+
+// 新增：关闭STRM文件格式编辑弹窗
+const closeStrmExtModal = () => {
+  showStrmExtModal.value = false
+  tempStrmSupportFileExtList.value = []
+  newExtension.value = ''
+  // 恢复页面滚动
+  document.body.style.overflow = ''
+}
+
+// 新增：添加文件扩展名
+const addExtension = () => {
+  const ext = newExtension.value.trim().toLowerCase()
+  if (!ext) {
+    toast.warning('请输入文件扩展名')
+    return
+  }
+
+  // 验证格式（只允许字母和数字）
+  if (!/^[a-z0-9]+$/.test(ext)) {
+    toast.warning('文件扩展名只能包含字母和数字')
+    return
+  }
+
+  if (tempStrmSupportFileExtList.value.includes(ext)) {
+    toast.warning('该扩展名已存在')
+    return
+  }
+
+  tempStrmSupportFileExtList.value.push(ext)
+  newExtension.value = ''
+  toast.success('扩展名添加成功')
+}
+
+// 新增：移除文件扩展名
+const removeExtension = (index: number) => {
+  tempStrmSupportFileExtList.value.splice(index, 1)
+}
+
+// 新增：全选扩展名
+const selectAllExtensions = () => {
+  tempStrmSupportFileExtList.value = [...DEFAULT_EXTENSIONS]
+  toast.info('已选择所有默认格式')
+}
+
+// 新增：清空扩展名
+const clearAllExtensions = () => {
+  tempStrmSupportFileExtList.value = []
+  toast.info('已清空所有格式')
+}
+
+// 新增：恢复默认扩展名
+const resetToDefaultExtensions = () => {
+  tempStrmSupportFileExtList.value = [...DEFAULT_EXTENSIONS]
+  toast.info('已恢复默认格式')
+}
+
+// 新增：保存STRM文件扩展名设置
+const saveStrmExtensions = async () => {
+  try {
+    modalLoading.value = true
+    await settingStore.modifyStrmSupportFileExtList(tempStrmSupportFileExtList.value)
+    strmSupportFileExtList.value = [...tempStrmSupportFileExtList.value]
+    toast.success('STRM支持文件格式保存成功')
+    closeStrmExtModal()
+  } catch (error) {
+    console.error('保存STRM支持文件格式失败:', error)
+    toast.error('保存STRM支持文件格式失败')
+  } finally {
+    modalLoading.value = false
+  }
+}
+
 // 组件挂载时获取设置并启动定时器
 onMounted(async () => {
   // 初始获取数据
@@ -690,6 +961,8 @@ onUnmounted(() => {
     clearInterval(timer.value)
     timer.value = null
   }
+  // 确保恢复页面滚动
+  document.body.style.overflow = ''
 })
 </script>
 
@@ -759,6 +1032,32 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
+/* STRM扩展名显示样式 */
+.strm-ext-display {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 200px;
+}
+
+.no-ext-text {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.ext-count {
+  font-size: 0.875rem;
+  color: #374151;
+  font-weight: 500;
+}
+
+.ext-preview {
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
 /* 按钮样式 */
 .btn {
   display: inline-flex;
@@ -775,9 +1074,15 @@ onUnmounted(() => {
 }
 
 .btn-sm {
-  padding: 0.5rem 1rem; /* 更小的内边距 */
-  font-size: 0.75rem; /* 更小的字体 */
-  border-radius: 6px; /* 更小的圆角 */
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  border-radius: 6px;
+}
+
+.btn-xs {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.625rem;
+  border-radius: 4px;
 }
 
 .btn:disabled {
@@ -932,6 +1237,192 @@ onUnmounted(() => {
   border: 1px solid #d1d5db;
 }
 
+/* 弹窗样式 - 修复滚动问题 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-width: 600px;
+  width: 100%;
+  max-height: calc(100vh - 2rem);
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+  flex-shrink: 0;
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.modal-close:hover {
+  color: #374151;
+}
+
+.modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border-top: 1px solid #f3f4f6;
+  flex-shrink: 0;
+}
+
+/* 扩展名编辑器样式 */
+.ext-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.ext-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ext-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.ext-input-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ext-input {
+  flex: 1;
+  padding: 0.625rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  transition: border-color 0.2s;
+}
+
+.ext-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.ext-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ext-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ext-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ext-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-height: 100px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f9fafb;
+}
+
+.ext-tag {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #3b82f6;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.ext-name {
+  line-height: 1;
+}
+
+.ext-remove {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 0.875rem;
+  line-height: 1;
+  padding: 0;
+  margin-left: 0.125rem;
+  transition: opacity 0.2s;
+}
+
+.ext-remove:hover {
+  opacity: 0.7;
+}
+
+.no-ext-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  font-style: italic;
+  font-size: 0.875rem;
+  width: 100%;
+  height: 100px;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .setting-item {
@@ -940,21 +1431,55 @@ onUnmounted(() => {
     gap: 1rem;
     padding: 1rem;
   }
-  
+
   .setting-control {
     width: 100%;
     justify-content: flex-start;
   }
-  
+
   .setting-input {
     min-width: auto;
     flex: 1;
     width: 100%;
   }
-  
+
   .thread-count-control {
     min-width: auto;
     width: 100%;
+  }
+
+  .strm-ext-display {
+    min-width: auto;
+    width: 100%;
+  }
+
+  .modal-overlay {
+    padding: 0.5rem;
+  }
+
+  .modal-content {
+    max-height: calc(100vh - 1rem);
+  }
+
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: 1rem;
+  }
+
+  .ext-input-group {
+    flex-direction: column;
+  }
+
+  .ext-list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .ext-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 </style>

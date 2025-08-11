@@ -137,7 +137,7 @@ export const useSettingStore = defineStore('setting', () => {
     }
   }
 
-  // 新增：修改多线程流线程数
+  // 修改多线程流线程数
   const modifyMultipleStreamThreadCount = async (threadCount: number) => {
     try {
       await settingApi.modifyMultipleStreamThreadCount({
@@ -152,7 +152,7 @@ export const useSettingStore = defineStore('setting', () => {
     }
   }
 
-  // 新增：修改多线程流块大小
+  // 修改多线程流块大小
   const modifyMultipleStreamChunkSize = async (multipleStreamChunkSize: number) => {
     try {
       await settingApi.modifyMultipleStreamChunkSize({
@@ -163,6 +163,36 @@ export const useSettingStore = defineStore('setting', () => {
       }
     } catch (error) {
       console.error('修改多线程流块大小失败:', error)
+      throw error
+    }
+  }
+
+  // 新增：切换STRM文件启用状态
+  const toggleStrmFileEnable = async (enable: boolean) => {
+    try {
+      await settingApi.toggleStrmFileEnable({
+        strmFileEnable: enable
+      })
+      if (setting.value) {
+        setting.value.strmFileEnable = enable
+      }
+    } catch (error) {
+      console.error('切换STRM文件启用状态失败:', error)
+      throw error
+    }
+  }
+
+  // 新增：修改STRM支持文件扩展名列表
+  const modifyStrmSupportFileExtList = async (extList: string[]) => {
+    try {
+      await settingApi.modifyStrmSupportFileExtList({
+        strmSupportFileExtList: extList
+      })
+      if (setting.value) {
+        setting.value.strmSupportFileExtList = extList
+      }
+    } catch (error) {
+      console.error('修改STRM支持文件扩展名列表失败:', error)
       throw error
     }
   }
@@ -194,6 +224,8 @@ export const useSettingStore = defineStore('setting', () => {
     modifyAutoRefreshMinutes,
     modifyMultipleStreamThreadCount,
     modifyMultipleStreamChunkSize,
+    toggleStrmFileEnable,
+    modifyStrmSupportFileExtList,
     initSystem
   }
 })

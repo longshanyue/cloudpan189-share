@@ -5,20 +5,20 @@
       <div class="modern-header" :class="{ 'header-fixed': headerFixed }">
         <div class="header-left">
           <div class="breadcrumb-nav">
-            <button 
-              @click="navigateToPath('')" 
-              class="breadcrumb-home"
-              title="返回根目录"
+            <button
+                @click="navigateToPath('')"
+                class="breadcrumb-home"
+                title="返回根目录"
             >
               <Icons name="home" size="1rem" />
             </button>
             <template v-for="(segment, index) in pathSegments" :key="index">
               <Icons name="chevron-right" size="0.8rem" class="breadcrumb-arrow" />
-              <button 
-                v-if="index < pathSegments.length - 1"
-                @click="navigateToPath(getPathUpTo(index))" 
-                class="breadcrumb-link"
-                :title="segment"
+              <button
+                  v-if="index < pathSegments.length - 1"
+                  @click="navigateToPath(getPathUpTo(index))"
+                  class="breadcrumb-link"
+                  :title="segment"
               >
                 {{ truncateText(segment, 8) }}
               </button>
@@ -28,11 +28,21 @@
             </template>
           </div>
         </div>
-        
+
         <div class="header-actions" style="display: flex; align-items: center;">
           <button @click="openSearchModal" class="action-btn secondary">
             <Icons name="search" size="1rem" />
             搜索
+          </button>
+          <button
+              v-if="settingStore.setting?.strmFileEnable"
+              @click="toggleShowStrmFiles"
+              class="action-btn"
+              :class="{ 'active': showStrmFiles }"
+              :title="showStrmFiles ? '隐藏STRM文件' : '显示STRM文件'"
+          >
+            <Icons name="file" size="1rem" />
+            {{ showStrmFiles ? '隐藏STRM' : '显示STRM' }}
           </button>
           <button @click="refreshCurrentPath" class="action-btn secondary" :disabled="loading">
             <Icons name="refresh" size="1rem" />
@@ -41,80 +51,80 @@
         </div>
       </div>
 
-    <!-- 文件列表 -->
-    <div class="file-list-container">
-      <div v-if="loading" class="loading-state">
-        <div class="loading-spinner"></div>
-        <p>加载中...</p>
-      </div>
-      
-      <div v-else-if="error" class="error-state">
-        <Icons name="alert" size="2rem" class="error-icon" />
-        <h3>访问出错</h3>
-        <p>无法访问此路径，请检查路径是否正确</p>
-        <button @click="navigateToPath('')" class="retry-btn">
-          返回根目录
-        </button>
-      </div>
-      
-      <div v-else class="file-list">
-        <!-- 文件列表头部 -->
-        <div class="file-list-header">
-          <div class="file-col-name">名称</div>
-          <div class="file-col-size">大小</div>
-          <div class="file-col-date">修改时间</div>
-          <div class="file-col-actions">操作</div>
+      <!-- 文件列表 -->
+      <div class="file-list-container">
+        <div v-if="loading" class="loading-state">
+          <div class="loading-spinner"></div>
+          <p>加载中...</p>
         </div>
-        
 
-        
-        <!-- 文件和文件夹列表 -->
-        <div 
-          v-for="item in fileList" 
-          :key="item.id" 
-          class="file-item"
-          :class="{ folder: item.isFolder }"
-          @click="handleItemClick(item)"
-        >
-          <div class="file-col-name">
-            <Icons 
-              :name="getFileIcon(item)" 
-              size="1.2rem" 
-              class="file-icon"
-              :class="{ 'folder-icon': item.isFolder }"
-            />
-            <span class="file-name">{{ item.name }}</span>
-          </div>
-          <div class="file-col-size">{{ formatFileSize(item.size) }}</div>
-          <div class="file-col-date">{{ formatDate(item.modifyDate) }}</div>
-          <div class="file-col-actions">
-            <button 
-              v-if="!item.isFolder && item.downloadURL" 
-              @click.stop="downloadFile(item)"
-              class="action-btn-small"
-              title="下载"
-            >
-              <Icons name="download" size="0.9rem" />
-            </button>
-            <button 
-              v-if="item.isFolder" 
-              @click.stop="refreshFolderIndex(item)"
-              class="action-btn-small refresh-btn"
-              title="如果文件夹内容未实际更新，点击刷新索引后会全量扫描文件夹内容及子文件夹内容"
-            >
-              <Icons name="refresh" size="0.9rem" />
-              <span>刷新索引</span>
-            </button>
-          </div>
+        <div v-else-if="error" class="error-state">
+          <Icons name="alert" size="2rem" class="error-icon" />
+          <h3>访问出错</h3>
+          <p>无法访问此路径，请检查路径是否正确</p>
+          <button @click="navigateToPath('')" class="retry-btn">
+            返回根目录
+          </button>
         </div>
-        
-        <!-- 空文件夹提示 -->
-        <div v-if="fileList.length === 0" class="empty-state">
-          <Icons name="folder" size="3rem" class="empty-icon" />
-          <p>此文件夹为空</p>
+
+        <div v-else class="file-list">
+          <!-- 文件列表头部 -->
+          <div class="file-list-header">
+            <div class="file-col-name">名称</div>
+            <div class="file-col-size">大小</div>
+            <div class="file-col-date">修改时间</div>
+            <div class="file-col-actions">操作</div>
+          </div>
+
+
+
+          <!-- 文件和文件夹列表 -->
+          <div
+              v-for="item in fileList"
+              :key="item.id"
+              class="file-item"
+              :class="{ folder: item.isFolder }"
+              @click="handleItemClick(item)"
+          >
+            <div class="file-col-name">
+              <Icons
+                  :name="getFileIcon(item)"
+                  size="1.2rem"
+                  class="file-icon"
+                  :class="{ 'folder-icon': item.isFolder }"
+              />
+              <span class="file-name">{{ item.name }}</span>
+            </div>
+            <div class="file-col-size">{{ formatFileSize(item.size) }}</div>
+            <div class="file-col-date">{{ formatDate(item.modifyDate) }}</div>
+            <div class="file-col-actions">
+              <button
+                  v-if="!item.isFolder && item.downloadURL"
+                  @click.stop="downloadFile(item)"
+                  class="action-btn-small"
+                  title="下载"
+              >
+                <Icons name="download" size="0.9rem" />
+              </button>
+              <button
+                  v-if="item.isFolder"
+                  @click.stop="refreshFolderIndex(item)"
+                  class="action-btn-small refresh-btn"
+                  title="如果文件夹内容未实际更新，点击刷新索引后会全量扫描文件夹内容及子文件夹内容"
+              >
+                <Icons name="refresh" size="0.9rem" />
+                <span>刷新索引</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 空文件夹提示 -->
+          <div v-if="fileList.length === 0" class="empty-state">
+            <Icons name="folder" size="3rem" class="empty-icon" />
+            <p>此文件夹为空</p>
+          </div>
         </div>
       </div>
-    </div>
 
     </div>
 
@@ -127,44 +137,44 @@
             <Icons name="close" size="1.2rem" />
           </button>
         </div>
-        
+
         <div class="search-modal-body">
           <div class="search-form">
-             <div class="search-row">
-               <div class="search-options-inline">
-                 <label class="inline-checkbox-label">
-                   <input
-                     v-model="globalSearch"
-                     type="checkbox"
-                     class="inline-checkbox"
-                   />
-                   <span class="inline-checkbox-text">全局搜索</span>
-                 </label>
-               </div>
-               
-               <div class="search-input-group">
-                 <input
-                   v-model="searchKeyword"
-                   type="text"
-                   placeholder="请输入搜索关键词"
-                   class="search-input"
-                   @keyup.enter="performSearch"
-                 />
-                 <button @click="performSearch" class="search-btn" :disabled="searchLoading || !searchKeyword.trim()">
-                   <Icons name="search" size="1rem" />
-                   搜索
-                 </button>
-               </div>
-             </div>
-           </div>
-          
+            <div class="search-row">
+              <div class="search-options-inline">
+                <label class="inline-checkbox-label">
+                  <input
+                      v-model="globalSearch"
+                      type="checkbox"
+                      class="inline-checkbox"
+                  />
+                  <span class="inline-checkbox-text">全局搜索</span>
+                </label>
+              </div>
+
+              <div class="search-input-group">
+                <input
+                    v-model="searchKeyword"
+                    type="text"
+                    placeholder="请输入搜索关键词"
+                    class="search-input"
+                    @keyup.enter="performSearch"
+                />
+                <button @click="performSearch" class="search-btn" :disabled="searchLoading || !searchKeyword.trim()">
+                  <Icons name="search" size="1rem" />
+                  搜索
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- 搜索结果 -->
           <div v-if="searchResults.length > 0 || searchLoading" class="search-results">
             <div v-if="searchLoading" class="search-loading">
               <div class="loading-spinner"></div>
               <p>搜索中...</p>
             </div>
-            
+
             <div v-else class="search-list">
               <div class="search-list-header">
                 <div class="search-col-name">名称</div>
@@ -172,19 +182,19 @@
                 <div class="search-col-size text-center">大小</div>
                 <div class="search-col-path text-center">路径</div>
               </div>
-              
+
               <div
-                v-for="item in searchResults"
-                :key="item.id"
-                class="search-item"
-                @click="navigateToSearchResult(item)"
+                  v-for="item in searchResults"
+                  :key="item.id"
+                  class="search-item"
+                  @click="navigateToSearchResult(item)"
               >
                 <div class="search-col-name">
                   <Icons
-                    :name="getFileIcon(item)"
-                    size="1.2rem"
-                    class="file-icon"
-                    :class="{ 'folder-icon': item.isFolder }"
+                      :name="getFileIcon(item)"
+                      size="1.2rem"
+                      class="file-icon"
+                      :class="{ 'folder-icon': item.isFolder }"
                   />
                   <span class="file-name">{{ item.name }}</span>
                 </div>
@@ -193,7 +203,7 @@
                 <div class="search-col-path text-center">{{ item.localPath }}</div>
               </div>
             </div>
-            
+
             <!-- 分页 -->
             <div v-if="searchTotal > 0" class="search-pagination">
               <div class="pagination-info">
@@ -201,23 +211,23 @@
               </div>
               <div class="pagination-controls">
                 <button
-                  @click="searchCurrentPage > 1 && changePage(searchCurrentPage - 1)"
-                  :disabled="searchCurrentPage <= 1 || searchLoading"
-                  class="pagination-btn"
+                    @click="searchCurrentPage > 1 && changePage(searchCurrentPage - 1)"
+                    :disabled="searchCurrentPage <= 1 || searchLoading"
+                    class="pagination-btn"
                 >
                   上一页
                 </button>
                 <button
-                  @click="searchCurrentPage < totalPages && changePage(searchCurrentPage + 1)"
-                  :disabled="searchCurrentPage >= totalPages || searchLoading"
-                  class="pagination-btn"
+                    @click="searchCurrentPage < totalPages && changePage(searchCurrentPage + 1)"
+                    :disabled="searchCurrentPage >= totalPages || searchLoading"
+                    class="pagination-btn"
                 >
                   下一页
                 </button>
               </div>
             </div>
           </div>
-          
+
           <div v-else-if="searchPerformed && !searchLoading" class="search-empty">
             <Icons name="search" size="2rem" class="empty-icon" />
             <p>未找到相关文件</p>
@@ -225,14 +235,14 @@
         </div>
       </div>
     </div>
-    
+
     <!-- 回到顶部按钮 -->
     <transition name="fade">
-      <button 
-        v-if="showBackToTop" 
-        @click="scrollToTop" 
-        class="back-to-top-btn"
-        title="回到顶部"
+      <button
+          v-if="showBackToTop"
+          @click="scrollToTop"
+          class="back-to-top-btn"
+          title="回到顶部"
       >
         <Icons name="arrow-up" size="1.2rem" />
       </button>
@@ -245,11 +255,13 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fileApi, type FileItem } from '@/api/file'
 import {storageApi, type SearchRequest, type SearchItem as SearchFileItem} from '@/api/storage'
+import { useSettingStore } from '@/stores/setting'
 import { toast } from '@/utils/toast'
 import Icons from '@/components/Icons.vue'
 
 const route = useRoute()
 const router = useRouter()
+const settingStore = useSettingStore()
 
 // 响应式数据
 const loading = ref(false)
@@ -258,6 +270,7 @@ const error = ref<{ title: string; message: string } | null>(null)
 const fileBrowserRef = ref<HTMLElement | null>(null)
 const showBackToTop = ref(false)
 const headerFixed = ref(false)
+const showStrmFiles = ref(false)
 
 // 搜索相关数据
 const showSearchModal = ref(false)
@@ -314,6 +327,12 @@ const navigateToPath = (path: string) => {
   }
 }
 
+// 切换显示STRM文件
+const toggleShowStrmFiles = () => {
+  showStrmFiles.value = !showStrmFiles.value
+  // 重新加载当前路径以应用新的过滤设置
+  loadFile(currentPath.value)
+}
 
 // 处理文件/文件夹点击
 const handleItemClick = (item: FileItem) => {
@@ -340,7 +359,7 @@ const getFileIcon = (item: { isFolder: number; name: string}): string => {
   if (item.isFolder) {
     return 'folder'
   }
-  
+
   const ext = item.name.split('.').pop()?.toLowerCase()
   switch (ext) {
     case 'mp4':
@@ -366,6 +385,8 @@ const getFileIcon = (item: { isFolder: number; name: string}): string => {
     case 'rar':
     case '7z':
       return 'archive'
+    case 'strm':
+      return 'video'
     default:
       return 'file'
   }
@@ -374,16 +395,16 @@ const getFileIcon = (item: { isFolder: number; name: string}): string => {
 // 格式化文件大小
 const formatFileSize = (size: number): string => {
   if (size === 0) return '-'
-  
+
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
   let index = 0
   let fileSize = size
-  
+
   while (fileSize >= 1024 && index < units.length - 1) {
     fileSize /= 1024
     index++
   }
-  
+
   return `${fileSize.toFixed(index === 0 ? 0 : 1)} ${units[index]}`
 }
 
@@ -462,10 +483,10 @@ const performSearch = async () => {
     toast.warning('请输入搜索关键词')
     return
   }
-  
+
   searchLoading.value = true
   searchCurrentPage.value = 1
-  
+
   try {
     const searchParams: SearchRequest = {
       keyword: searchKeyword.value.trim(),
@@ -473,11 +494,11 @@ const performSearch = async () => {
       currentPage: searchCurrentPage.value,
       global: globalSearch.value
     }
-    
+
     if (!globalSearch.value && currentFile.value) {
       searchParams.pid = currentFile.value.id
     }
-    
+
     const response = await storageApi.search(searchParams)
     searchResults.value = response.data
     searchTotal.value = response.total
@@ -496,10 +517,10 @@ const changePage = async (page: number) => {
   if (page < 1 || page > totalPages.value || searchLoading.value) {
     return
   }
-  
+
   searchCurrentPage.value = page
   searchLoading.value = true
-  
+
   try {
     const searchParams: SearchRequest = {
       keyword: searchKeyword.value.trim(),
@@ -507,11 +528,11 @@ const changePage = async (page: number) => {
       currentPage: searchCurrentPage.value,
       global: globalSearch.value
     }
-    
+
     if (!globalSearch.value && currentFile.value) {
       searchParams.pid = currentFile.value.id
     }
-    
+
     const response = await storageApi.search(searchParams)
     searchResults.value = response.data
     searchTotal.value = response.total
@@ -525,10 +546,10 @@ const changePage = async (page: number) => {
 
 const navigateToSearchResult = (item: SearchFileItem) => {
   closeSearchModal()
-  
+
   // 根据localPath导航到文件位置
   const path = item.localPath.startsWith('/') ? item.localPath.substring(1) : item.localPath
-  
+
   if (item.isFolder) {
     // 如果是文件夹，直接导航到该路径
     navigateToPath(path)
@@ -542,7 +563,7 @@ const getFileType = (item: SearchFileItem): string => {
   if (item.isFolder) {
     return '文件夹'
   }
-  
+
   const ext = item.name.split('.').pop()?.toLowerCase()
   switch (ext) {
     case 'mp4':
@@ -568,6 +589,8 @@ const getFileType = (item: SearchFileItem): string => {
     case 'rar':
     case '7z':
       return '压缩包'
+    case 'strm':
+      return 'STRM'
     default:
       return '文件'
   }
@@ -578,20 +601,25 @@ const loadFile = async (path: string) => {
   try {
     loading.value = true
     error.value = null
-    
-    const result = await fileApi.getFile(path)
-    
+
+    // 根据showStrmFiles状态决定是否包含STRM文件
+    const options = {
+      includeAutoGenerateStrmFile: showStrmFiles.value
+    }
+
+    const result = await fileApi.getFile(path, options)
+
     // 如果返回的是文件而不是文件夹，跳转到文件详情页面
     if (result && !result.isFolder && result.downloadURL) {
       router.push(`/file/${path}`)
       return
     }
-    
+
     currentFile.value = result
-    
+
   } catch (err: any) {
     console.error('加载文件失败:', err)
-    
+
     if (err.code === 404) {
       error.value = {
         title: '文件不存在',
@@ -610,15 +638,24 @@ const loadFile = async (path: string) => {
 
 // 监听路由变化
 watch(
-  () => currentPath.value,
-  (newPath) => {
-    loadFile(newPath)
-  },
-  { immediate: true }
+    () => currentPath.value,
+    (newPath) => {
+      loadFile(newPath)
+    },
+    { immediate: true }
 )
 
 // 组件挂载时加载
-onMounted(() => {
+onMounted(async () => {
+  // 初始化设置store
+  if (!settingStore.setting) {
+    try {
+      await settingStore.fetchSetting()
+    } catch (error) {
+      console.error('获取设置失败:', error)
+    }
+  }
+
   loadFile(currentPath.value)
   window.addEventListener('scroll', handleScroll)
 })
@@ -805,6 +842,12 @@ onUnmounted(() => {
   color: #3b82f6;
 }
 
+.action-btn.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
 .action-btn:hover:not(:disabled) {
   background: #f9fafb;
   border-color: #9ca3af;
@@ -817,6 +860,13 @@ onUnmounted(() => {
   border-color: #3b82f6;
   color: white;
   box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.action-btn.active:hover:not(:disabled) {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: white;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
 }
 
 .action-btn:active {
@@ -1059,22 +1109,22 @@ onUnmounted(() => {
     gap: 1rem;
     align-items: stretch;
   }
-  
+
   .breadcrumb {
     flex-wrap: wrap;
   }
-  
+
   .file-list-header,
   .file-item {
     grid-template-columns: 1fr 80px;
     gap: 0.5rem;
   }
-  
+
   .file-col-size,
   .file-col-date {
     display: none;
   }
-  
+
   .file-list-container {
     padding: 1rem;
   }
@@ -1084,39 +1134,39 @@ onUnmounted(() => {
   .file-browser {
     padding: 1rem;
   }
-  
+
   .browser-header {
     flex-direction: column;
     gap: 1rem;
     padding: 1rem;
   }
-  
+
   .breadcrumb {
     flex-wrap: wrap;
     gap: 0.5rem;
   }
-  
+
   .breadcrumb-item {
     padding: 0.5rem 0.75rem;
     font-size: 0.8rem;
   }
-  
+
   .file-item {
     padding: 0.75rem 1rem;
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
   }
-  
+
   .file-icon {
     width: 2rem;
     height: 2rem;
   }
-  
+
   .file-name {
     font-size: 0.9rem;
   }
-  
+
   .file-col-size,
   .file-col-date {
     font-size: 0.8rem;
@@ -1127,16 +1177,16 @@ onUnmounted(() => {
   .file-browser {
     padding: 0.5rem;
   }
-  
+
   .browser-header {
     padding: 0.75rem;
   }
-  
+
   .breadcrumb-item {
     padding: 0.4rem 0.6rem;
     font-size: 0.75rem;
   }
-  
+
   .action-btn {
     padding: 0.5rem 1rem;
     font-size: 0.8rem;
@@ -1490,27 +1540,27 @@ onUnmounted(() => {
     margin: 1rem;
     max-height: 90vh;
   }
-  
+
   .search-modal-header,
   .search-modal-body {
     padding: 1rem;
   }
-  
+
   .search-input-group {
     flex-direction: column;
   }
-  
+
   .search-list-header,
   .search-item {
     grid-template-columns: 1fr;
     gap: 0.5rem;
   }
-  
+
   .search-col-type,
   .search-col-size {
     display: none;
   }
-  
+
   .pagination-controls {
     flex-direction: column;
     gap: 0.25rem;
