@@ -167,7 +167,7 @@ export const useSettingStore = defineStore('setting', () => {
     }
   }
 
-  // 新增：切换STRM文件启用状态
+  // 切换STRM文件启用状态
   const toggleStrmFileEnable = async (enable: boolean) => {
     try {
       await settingApi.toggleStrmFileEnable({
@@ -182,7 +182,7 @@ export const useSettingStore = defineStore('setting', () => {
     }
   }
 
-  // 新增：修改STRM支持文件扩展名列表
+  // 修改STRM支持文件扩展名列表
   const modifyStrmSupportFileExtList = async (extList: string[]) => {
     try {
       await settingApi.modifyStrmSupportFileExtList({
@@ -193,6 +193,21 @@ export const useSettingStore = defineStore('setting', () => {
       }
     } catch (error) {
       console.error('修改STRM支持文件扩展名列表失败:', error)
+      throw error
+    }
+  }
+
+  // 新增：切换文件可写状态
+  const toggleFileWritable = async (enable: boolean) => {
+    try {
+      await settingApi.toggleFileWritable({
+        fileWritable: enable
+      })
+      if (setting.value) {
+        setting.value.fileWritable = enable
+      }
+    } catch (error) {
+      console.error('切换文件可写状态失败:', error)
       throw error
     }
   }
@@ -226,6 +241,7 @@ export const useSettingStore = defineStore('setting', () => {
     modifyMultipleStreamChunkSize,
     toggleStrmFileEnable,
     modifyStrmSupportFileExtList,
+    toggleFileWritable, // 新增
     initSystem
   }
 })

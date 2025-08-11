@@ -126,6 +126,8 @@ func Init() {
 			shared.StrmFileEnable = dict.Value.Bool()
 		case models.SettingDictKeyStrmSupportFileExtList:
 			shared.StrmSupportFileExtList = dict.Value.StringSlice()
+		case models.SettingDictKeyFileWritable:
+			shared.FileWritable = dict.Value.Bool()
 		}
 	}
 

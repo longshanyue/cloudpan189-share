@@ -3,6 +3,7 @@ package universalfs
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"golang.org/x/net/webdav"
 	"net/url"
 	"sort"
 	"strconv"
@@ -21,22 +22,27 @@ type Service interface {
 	Open(prefix string, format string) gin.HandlerFunc
 	FileDownload() gin.HandlerFunc
 	DavMiddleware() gin.HandlerFunc
+	BaseMiddleware() gin.HandlerFunc
+	Put() gin.HandlerFunc
+	Delete() gin.HandlerFunc
 }
 
 type service struct {
-	db        *gorm.DB
-	logger    *zap.Logger
-	startTime time.Time
-	cache     *cache.Cache
-	g         singleflight.Group
+	db         *gorm.DB
+	logger     *zap.Logger
+	startTime  time.Time
+	cache      *cache.Cache
+	g          singleflight.Group
+	LockSystem webdav.LockSystem
 }
 
 func NewService(db *gorm.DB, logger *zap.Logger) Service {
 	return &service{
-		db:        db,
-		logger:    logger,
-		startTime: time.Now(),
-		cache:     cache.New(time.Minute, time.Minute*10),
+		db:         db,
+		logger:     logger,
+		startTime:  time.Now(),
+		cache:      cache.New(time.Minute, time.Minute*10),
+		LockSystem: webdav.NewMemLS(),
 	}
 }
 

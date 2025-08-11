@@ -3,9 +3,12 @@ package universalfs
 import (
 	"context"
 	"fmt"
+	"github.com/xxcheng123/cloudpan189-share/configs"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -72,6 +75,48 @@ func (s *service) FileDownload() gin.HandlerFunc {
 			ctx.Header("X-Download-Url-Cache", "true")
 
 			s.doResponse(ctx, v.(string))
+
+			return
+		}
+
+		file := &models.VirtualFile{}
+		if err := s.db.WithContext(ctx).Where("id = ?", req.ID).First(file).Error; err != nil {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"code":    http.StatusNotFound,
+				"message": "file not found",
+			})
+
+			return
+		}
+
+		if file.OsType == models.OsTypeRealFile {
+			v, ok := file.Addition["file_path"]
+			if !ok {
+				ctx.JSON(http.StatusInternalServerError, gin.H{
+					"code":    http.StatusInternalServerError,
+					"message": "文件路径不存在",
+				})
+				return
+			}
+
+			filePath := v.(string)
+			fullPath := path.Join(configs.GetConfig().FileDir, filePath)
+
+			// 检查文件是否存在
+			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+				ctx.JSON(http.StatusNotFound, gin.H{
+					"code":    http.StatusNotFound,
+					"message": "文件不存在",
+				})
+				return
+			}
+
+			filename := file.Name
+
+			// 设置下载文件名
+			ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s", filename, url.QueryEscape(filename)))
+			
+			ctx.File(fullPath)
 
 			return
 		}

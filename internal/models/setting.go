@@ -84,12 +84,14 @@ const (
 	SettingDictKeyMultipleStreamChunkSize   = "multiple_stream_chunk_size"
 	SettingDictKeyStrmFileEnable            = "strm_file_enable"
 	SettingDictKeyStrmSupportFileExtList    = "strm_support_file_ext_list"
+	SettingDictKeyFileWritable              = "file_writable"
 )
 
 const (
 	DefaultMultipleStreamThreadCount = 6
 	DefaultMultipleStreamChunkSize   = 1024 * 1024 * 4
 	DefaultStrmFileEnable            = false
+	DefaultFileWritable              = false
 )
 
 var (
@@ -206,4 +208,23 @@ func (s *SettingDict) SetStrmSupportFileExtList(db *gorm.DB, value []string) *go
 	b, _ := json.Marshal(value)
 
 	return s.store(db, SettingDictKeyStrmSupportFileExtList, string(b), "json")
+}
+
+func (s *SettingDict) GetFileWritable(db *gorm.DB) bool {
+	value, err := s.query(db, SettingDictKeyFileWritable)
+	if err != nil {
+		return DefaultFileWritable
+	}
+
+	var v bool
+
+	if v, err = strconv.ParseBool(value); err != nil {
+		return DefaultFileWritable
+	}
+
+	return v
+}
+
+func (s *SettingDict) SetFileWritable(db *gorm.DB, value bool) *gorm.DB {
+	return s.store(db, SettingDictKeyFileWritable, strconv.FormatBool(value), "bool")
 }

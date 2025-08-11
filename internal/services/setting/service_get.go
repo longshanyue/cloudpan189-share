@@ -16,6 +16,7 @@ type getResponse struct {
 	MultipleStreamChunkSize   int64    `json:"multipleStreamChunkSize"`
 	StrmFileEnable            bool     `json:"strmFileEnable"`
 	StrmSupportFileExtList    []string `json:"strmSupportFileExtList"`
+	FileWritable              bool     `json:"fileWritable"`
 }
 
 func (s *service) Get() gin.HandlerFunc {
@@ -27,6 +28,7 @@ func (s *service) Get() gin.HandlerFunc {
 			MultipleStreamChunkSize:   shared.MultipleStreamChunkSize,
 			StrmFileEnable:            shared.StrmFileEnable,
 			StrmSupportFileExtList:    shared.StrmSupportFileExtList,
+			FileWritable:              shared.FileWritable,
 		})
 	}
 }

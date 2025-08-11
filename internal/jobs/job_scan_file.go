@@ -280,7 +280,7 @@ func (w *scanWorker) execute(ctx context.Context, f *models.VirtualFile, deep bo
 
 	// 遍历数据库中的文件，找出需要删除的文件
 	for name, dbFile := range dbFileMap {
-		if _, exists := scannedFileMap[name]; !exists && dbFile.IsTop != 1 {
+		if _, exists := scannedFileMap[name]; !exists && dbFile.IsTop != 1 && dbFile.OsType != models.OsTypeRealFile && dbFile.OsType != models.OsTypeStrmFile {
 			w.logger.Debug("file to be deleted - not in remote",
 				zap.String("parent", f.Name),
 				zap.String("file_name", name),

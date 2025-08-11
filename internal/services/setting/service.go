@@ -27,6 +27,7 @@ type Service interface {
 	ModifyMultipleStreamChunkSize() gin.HandlerFunc
 	ToggleStrmFileEnable() gin.HandlerFunc
 	ModifyStrmSupportFileExtList() gin.HandlerFunc
+	ToggleFileWritable() gin.HandlerFunc
 }
 
 type service struct {

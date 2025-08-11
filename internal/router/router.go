@@ -90,6 +90,7 @@ func StartHTTPServer() error {
 		settingRouter.POST("/modify_multiple_stream_chunk_size", settingService.ModifyMultipleStreamChunkSize())
 		settingRouter.POST("/toggle_strm_file_enable", settingService.ToggleStrmFileEnable())
 		settingRouter.POST("/modify_strm_support_file_ext_list", settingService.ModifyStrmSupportFileExtList())
+		settingRouter.POST("/toggle_file_writable", settingService.ToggleFileWritable())
 
 		openapiRouter.POST("/setting/init_system", settingService.InitSystem())
 	}
@@ -106,15 +107,59 @@ func StartHTTPServer() error {
 	}
 
 	{
-		openapiRouter.GET("/open_file/*path", userService.AuthMiddleware(models.PermissionBase), universalFsService.Open("/", "json"))
-		davMethods := []string{"GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PROPFIND", "MKCOL", "MOVE", "LOCK", "UNLOCK"}
-		for _, method := range davMethods {
-			engine.Handle(method, "/dav/*path", userService.BasicAuthMiddleware(models.PermissionDavRead), universalFsService.DavMiddleware(), universalFsService.Open("/dav", "dav"))
-			engine.Handle(method, "/dav", userService.BasicAuthMiddleware(models.PermissionDavRead), universalFsService.DavMiddleware(), universalFsService.Open("/dav", "dav"))
+		openapiRouter.GET("/open_file/*path", userService.AuthMiddleware(models.PermissionBase), universalFsService.BaseMiddleware(), universalFsService.Open("/", "json"))
+		davMethods := []string{"GET", "HEAD", "POST", "OPTIONS", "PROPFIND", "MKCOL", "MOVE", "LOCK", "UNLOCK"}
 
-			engine.Handle(method, "/strm_dav/*path", userService.BasicAuthMiddleware(models.PermissionDavRead), universalFsService.DavMiddleware(), universalFsService.Open("/strm_dav", "strm_dav"))
-			engine.Handle(method, "/strm_dav", userService.BasicAuthMiddleware(models.PermissionDavRead), universalFsService.DavMiddleware(), universalFsService.Open("/strm_dav", "strm_dav"))
+		handler := []gin.HandlerFunc{
+			userService.BasicAuthMiddleware(models.PermissionBase),
+			universalFsService.DavMiddleware(),
+			universalFsService.BaseMiddleware(),
 		}
+		registry := []struct {
+			path     string
+			prefix   string
+			format   string
+			handlers []gin.HandlerFunc
+		}{
+			{
+				"/dav/*path",
+				"/dav",
+				"dav",
+				handler,
+			},
+			{
+				"/dav",
+				"/dav",
+				"dav",
+				handler,
+			},
+			{
+				"/strm_dav/*path",
+				"/strm_dav",
+				"strm_dav",
+				handler,
+			},
+			{
+				"/strm_dav",
+				"/strm_dav",
+				"strm_dav",
+				handler,
+			},
+		}
+
+		for _, method := range davMethods {
+			for _, r := range registry {
+				engine.Handle(method, r.path, append(r.handlers, universalFsService.Open(r.prefix, r.format))...)
+			}
+		}
+
+		for _, r := range registry {
+			engine.Handle(http.MethodPut, r.path, append(r.handlers, universalFsService.Put())...)
+		}
+		for _, r := range registry {
+			engine.Handle(http.MethodDelete, r.path, append(r.handlers, universalFsService.Delete())...)
+		}
+
 		openapiRouter.GET("/file_download", universalFsService.FileDownload())
 	}
 

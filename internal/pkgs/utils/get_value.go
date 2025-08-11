@@ -95,3 +95,18 @@ func String(value interface{}) string {
 		return fmt.Sprintf("%v", v)
 	}
 }
+
+func StringSlice(value interface{}) []string {
+	switch v := value.(type) {
+	case []string:
+		return v
+	case []interface{}:
+		var s []string
+		for _, v := range v {
+			s = append(s, String(v))
+		}
+		return s
+	default:
+		return []string{String(v)}
+	}
+}

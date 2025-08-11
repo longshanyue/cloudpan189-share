@@ -1,26 +1,20 @@
 package universalfs
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
+	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/samber/lo"
+	"github.com/xxcheng123/cloudpan189-share/internal/models"
+	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
+	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"net/http"
 	"net/url"
 	"path"
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/samber/lo"
-	"go.uber.org/zap"
-
-	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/xxcheng123/cloudpan189-share/internal/models"
-	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
-	"github.com/xxcheng123/cloudpan189-share/internal/shared"
-	"gorm.io/gorm"
 )
 
 type openRequest struct {
@@ -29,19 +23,11 @@ type openRequest struct {
 
 func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		rawPath := ctx.Param("path")
+		var (
+			req = new(openRequest)
+			err error
+		)
 
-		paths, err := utils.SplitPath(rawPath)
-		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": err.Error(),
-			})
-
-			return
-		}
-
-		req := new(openRequest)
 		if err = ctx.ShouldBindQuery(req); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"code":    http.StatusBadRequest,
@@ -51,36 +37,15 @@ func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 			return
 		}
 
-		var pid int64
-		var fullPaths = make([]string, 0)
-		var session = new(ReadSession)
-		var file = new(models.VirtualFile)
-
 		var (
-			groupId      = ctx.GetInt64("group_id")
-			groupFileSet = mapset.NewSet[int64]()
+			fid  = ctx.GetInt64("x_fid")
+			pid  = ctx.GetInt64("x_pid")
+			gid  = ctx.GetInt64("group_id")
+			file = new(models.VirtualFile)
 		)
 
-		if groupId != 0 {
-			groupFiles := make([]*models.Group2File, 0)
-
-			if err = s.db.WithContext(ctx).Model(new(models.Group2File)).Where("group_id", groupId).Find(&groupFiles).Error; err != nil {
-				s.logger.Error("get group files failure", zap.Error(err))
-
-				ctx.JSON(http.StatusInternalServerError, gin.H{
-					"code":    http.StatusInternalServerError,
-					"message": "获取用户组文件关系失败",
-				})
-
-				return
-			}
-
-			for _, groupFile := range groupFiles {
-				groupFileSet.Add(groupFile.FileId)
-			}
-		}
-
-		if len(paths) == 0 {
+		if pid == -1 && fid == 0 {
+			// 特殊处理
 			file = &models.VirtualFile{
 				ID:         0,
 				ParentId:   -1,
@@ -95,45 +60,22 @@ func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 				Addition:   map[string]interface{}{},
 			}
 		} else {
-			for _, p := range paths {
-				var tmpFile = new(models.VirtualFile)
-				if err = s.db.WithContext(ctx).Where("parent_id", pid).Where("name", p).First(tmpFile).Error; err != nil {
-					if errors.Is(err, gorm.ErrRecordNotFound) {
-						ctx.JSON(http.StatusNotFound, gin.H{
-							"code":    http.StatusNotFound,
-							"message": "file not found",
-						})
+			if err = s.db.WithContext(ctx).Where("id", fid).First(&file).Error; err != nil {
+				ctx.JSON(http.StatusBadRequest, gin.H{
+					"code":    http.StatusBadRequest,
+					"message": err.Error(),
+				})
 
-						return
-					}
-
-					ctx.JSON(http.StatusBadRequest, gin.H{
-						"code":    http.StatusBadRequest,
-						"message": err.Error(),
-					})
-
-					return
-				} else {
-					if v, ok := tmpFile.Addition["cloud_token"]; ok {
-						session.CloudTokenID, _ = v.(json.Number).Int64()
-					}
-				}
-
-				if tmpFile.IsTop == 1 && groupId != 0 && !groupFileSet.Contains(tmpFile.ID) {
-					// 没有权限
-					ctx.JSON(http.StatusForbidden, gin.H{
-						"code":    http.StatusForbidden,
-						"message": "no permission",
-					})
-
-					return
-				}
-
-				fullPaths = append(fullPaths, p)
-				pid = tmpFile.ID
-				file = tmpFile
+				return
 			}
 		}
+
+		var (
+			vPath, _         = ctx.Get("x_full_paths")
+			fullPaths        = utils.StringSlice(vPath)
+			vGroupFileSet, _ = ctx.Get("x_group_file_set")
+			groupFileSet     = vGroupFileSet.(mapset.Set[int64])
+		)
 
 		f := &FileInfo{
 			VirtualFile: file,
@@ -160,7 +102,7 @@ func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 				})
 			}
 
-			if groupId != 0 {
+			if gid != 0 {
 				f.Children = lo.Filter(f.Children, func(item *FileInfo, _ int) bool {
 					if item.IsTop == 1 && !groupFileSet.Contains(item.ID) {
 						return false

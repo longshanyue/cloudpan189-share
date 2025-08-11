@@ -9,4 +9,5 @@ var (
 	MultipleStreamChunkSize   int64    = models.DefaultMultipleStreamChunkSize
 	StrmFileEnable            bool     = models.DefaultStrmFileEnable
 	StrmSupportFileExtList    []string = models.DefaultStrmSupportFileExtList
+	FileWritable              bool     = models.DefaultFileWritable
 )

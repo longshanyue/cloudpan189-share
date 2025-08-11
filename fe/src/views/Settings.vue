@@ -267,7 +267,7 @@
         </div>
       </div>
 
-      <!-- 新增：STRM文件生成设置 -->
+      <!-- STRM文件生成设置 -->
       <div class="setting-item">
         <div class="setting-label">
           <span class="label-text">STRM文件生成</span>
@@ -294,7 +294,7 @@
         </div>
       </div>
 
-      <!-- STRM支持文件格式设置 - 移除条件判断，始终显示 -->
+      <!-- STRM支持文件格式设置 -->
       <div class="setting-item">
         <div class="setting-label">
           <span class="label-text">STRM支持文件格式</span>
@@ -316,6 +316,25 @@
           >
             编辑格式
           </button>
+        </div>
+      </div>
+
+      <!-- 新增：WebDAV写入权限设置 -->
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">WebDAV写入权限</span>
+          <span class="label-desc">开启后允许通过WebDAV协议写入和删除真实文件，关闭后WebDAV仅提供只读访问。注意：此功能仅影响真实文件，不包括挂载的分享文件以及strm等虚拟文件，如果父级文件夹被删除，则文件也会被删除。</span>
+        </div>
+        <div class="setting-control">
+          <div class="custom-switch" @click="handleToggleFileWritable">
+            <input
+                type="checkbox"
+                :checked="settingStore.setting?.fileWritable"
+                :disabled="loading"
+                class="switch-input"
+            >
+            <span class="switch-slider"></span>
+          </div>
         </div>
       </div>
 
@@ -430,10 +449,10 @@ const originalMultipleStreamThreadCount = ref(6) // 用于存储原始多线程�
 const multipleStreamChunkSize = ref(4096) // 默认4MB，以KB为单位
 const originalMultipleStreamChunkSize = ref(4096) // 用于存储原始多线程流块大小
 
-// 新增：STRM相关参数
+// STRM相关参数
 const strmSupportFileExtList = ref<string[]>([])
 
-// 新增：STRM文件格式编辑弹窗相关
+// STRM文件格式编辑弹窗相关
 const showStrmExtModal = ref(false)
 const modalLoading = ref(false)
 const tempStrmSupportFileExtList = ref<string[]>([])
@@ -522,7 +541,7 @@ const fetchSettingData = async () => {
       multipleStreamChunkSize.value = Math.round((data.multipleStreamChunkSize || 4194304) / 1024)
       originalMultipleStreamChunkSize.value = Math.round((data.multipleStreamChunkSize || 4194304) / 1024)
 
-      // 新增：设置STRM相关参数
+      // 设置STRM相关参数
       strmSupportFileExtList.value = data.strmSupportFileExtList || []
     }
   } catch (error) {
@@ -809,7 +828,7 @@ const handleModifyMultipleStreamChunkSize = async () => {
   }
 }
 
-// 新增：切换STRM文件生成
+// 切换STRM文件生成
 const handleToggleStrmFileEnable = async () => {
   const currentStrmFileEnable = settingStore.setting?.strmFileEnable
   const action = currentStrmFileEnable ? '关闭' : '开启'
@@ -838,7 +857,7 @@ const handleToggleStrmFileEnable = async () => {
   }
 }
 
-// 新增：重建STRM文件
+// 重建STRM文件
 const handleRebuildStrmFiles = async () => {
   const confirmed = await confirmDialog({
     title: '重建STRM文件',
@@ -865,7 +884,36 @@ const handleRebuildStrmFiles = async () => {
   }
 }
 
-// 新增：打开STRM文件格式编辑弹窗
+// 新增：切换WebDAV写入权限
+const handleToggleFileWritable = async () => {
+  const currentFileWritable = settingStore.setting?.fileWritable
+  const action = currentFileWritable ? '关闭' : '开启'
+
+  const confirmed = await confirmDialog({
+    title: `${action}WebDAV写入权限`,
+    message: `确定要${action}WebDAV写入权限吗？${currentFileWritable ? '关闭后WebDAV将变为只读模式。' : '开启后允许通过WebDAV写入和删除真实文件。'}`,
+    confirmText: '确认',
+    cancelText: '取消',
+    isDanger: currentFileWritable
+  })
+
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    loading.value = true
+    await settingStore.toggleFileWritable(!currentFileWritable)
+    toast.success(`WebDAV写入权限已${action}`)
+  } catch (error) {
+    console.error('切换WebDAV写入权限失败:', error)
+    toast.error('切换WebDAV写入权限失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 打开STRM文件格式编辑弹窗
 const openStrmExtModal = () => {
   tempStrmSupportFileExtList.value = [...strmSupportFileExtList.value]
   newExtension.value = ''
@@ -874,7 +922,7 @@ const openStrmExtModal = () => {
   document.body.style.overflow = 'hidden'
 }
 
-// 新增：关闭STRM文件格式编辑弹窗
+// 关闭STRM文件格式编辑弹窗
 const closeStrmExtModal = () => {
   showStrmExtModal.value = false
   tempStrmSupportFileExtList.value = []
@@ -883,7 +931,7 @@ const closeStrmExtModal = () => {
   document.body.style.overflow = ''
 }
 
-// 新增：添加文件扩展名
+// 添加文件扩展名
 const addExtension = () => {
   const ext = newExtension.value.trim().toLowerCase()
   if (!ext) {
@@ -907,30 +955,30 @@ const addExtension = () => {
   toast.success('扩展名添加成功')
 }
 
-// 新增：移除文件扩展名
+// 移除文件扩展名
 const removeExtension = (index: number) => {
   tempStrmSupportFileExtList.value.splice(index, 1)
 }
 
-// 新增：全选扩展名
+// 全选扩展名
 const selectAllExtensions = () => {
   tempStrmSupportFileExtList.value = [...DEFAULT_EXTENSIONS]
   toast.info('已选择所有默认格式')
 }
 
-// 新增：清空扩展名
+// 清空扩展名
 const clearAllExtensions = () => {
   tempStrmSupportFileExtList.value = []
   toast.info('已清空所有格式')
 }
 
-// 新增：恢复默认扩展名
+// 恢复默认扩展名
 const resetToDefaultExtensions = () => {
   tempStrmSupportFileExtList.value = [...DEFAULT_EXTENSIONS]
   toast.info('已恢复默认格式')
 }
 
-// 新增：保存STRM文件扩展名设置
+// 保存STRM文件扩展名设置
 const saveStrmExtensions = async () => {
   try {
     modalLoading.value = true
@@ -967,6 +1015,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 原有样式保持不变... */
 /* 设置项样式 */
 .setting-item {
   display: flex;

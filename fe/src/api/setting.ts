@@ -20,6 +20,7 @@ export interface Setting {
   multipleStreamChunkSize: number // 多线程流块大小
   strmFileEnable: boolean // STRM文件启用状态
   strmSupportFileExtList: string[] // STRM支持的文件扩展名列表
+  fileWritable: boolean // 文件可写状态
 }
 
 export interface InitSystemRequest {
@@ -72,14 +73,19 @@ export interface ModifyMultipleStreamChunkSizeRequest {
   multipleStreamChunkSize: number // 512KB-32MB之间
 }
 
-// 新增：切换STRM文件启用状态请求
+// 切换STRM文件启用状态请求
 export interface ToggleStrmFileEnableRequest {
   strmFileEnable: boolean
 }
 
-// 新增：修改STRM支持文件扩展名列表请求
+// 修改STRM支持文件扩展名列表请求
 export interface ModifyStrmSupportFileExtListRequest {
   strmSupportFileExtList: string[] // 可选，不传或空数组表示清空列表
+}
+
+// 新增：切换文件可写状态请求
+export interface ToggleFileWritableRequest {
+  fileWritable: boolean
 }
 
 // 修改操作的通用响应
@@ -149,14 +155,19 @@ export const settingApi = {
     return api.post('/setting/modify_multiple_stream_chunk_size', data)
   },
 
-  // 新增：切换STRM文件启用状态
+  // 切换STRM文件启用状态
   toggleStrmFileEnable: (data: ToggleStrmFileEnableRequest): Promise<ModifyResponse> => {
     return api.post('/setting/toggle_strm_file_enable', data)
   },
 
-  // 新增：修改STRM支持文件扩展名列表
+  // 修改STRM支持文件扩展名列表
   modifyStrmSupportFileExtList: (data: ModifyStrmSupportFileExtListRequest): Promise<ModifyResponse> => {
     return api.post('/setting/modify_strm_support_file_ext_list', data)
+  },
+
+  // 新增：切换文件可写状态
+  toggleFileWritable: (data: ToggleFileWritableRequest): Promise<ModifyResponse> => {
+    return api.post('/setting/toggle_file_writable', data)
   },
 
   // 初始化系统
