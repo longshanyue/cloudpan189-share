@@ -16,6 +16,7 @@ type Service interface {
 	ModifyToken() gin.HandlerFunc
 	DeepRefreshFile() gin.HandlerFunc
 	Search() gin.HandlerFunc
+	ClearRealFile() gin.HandlerFunc
 }
 
 type service struct {

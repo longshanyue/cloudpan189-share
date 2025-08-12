@@ -2,6 +2,7 @@ package user
 
 import (
 	"errors"
+	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"net/http"
 	"strings"
 
@@ -114,6 +115,7 @@ func (s *service) AuthMiddleware(permission uint8) gin.HandlerFunc {
 		ctx.Set("username", username)
 		ctx.Set("permissions", user.Permissions)
 		ctx.Set("group_id", user.GroupID)
+		ctx.Set(consts.CtxKeyGroupId, user.GroupID)
 
 		ctx.Next()
 	}

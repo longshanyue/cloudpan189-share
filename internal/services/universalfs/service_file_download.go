@@ -3,7 +3,6 @@ package universalfs
 import (
 	"context"
 	"fmt"
-	"github.com/xxcheng123/cloudpan189-share/configs"
 	"io"
 	"net/http"
 	"net/url"
@@ -15,13 +14,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
+
 	"github.com/xxcheng123/cloudpan189-interface/client"
+	"github.com/xxcheng123/cloudpan189-share/configs"
+	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
 	"github.com/xxcheng123/cloudpan189-share/internal/shared"
+	"github.com/xxcheng123/cloudpan189-share/internal/types"
 	"github.com/xxcheng123/multistreamer"
-	"go.uber.org/zap"
-	"gorm.io/gorm"
 )
 
 type fileDownloadRequest struct {
@@ -31,30 +34,57 @@ type fileDownloadRequest struct {
 	Sign      string `form:"sign" binding:"required"`
 }
 
+type DoResult struct {
+	Content  string
+	HttpCode int
+	Err      error
+}
+
+// 全局HTTP客户端，复用连接
+var globalHTTPClient = &http.Client{
+	Timeout: 0,
+	Transport: &http.Transport{
+		DisableKeepAlives:     false,
+		MaxIdleConns:          200,
+		MaxIdleConnsPerHost:   20,
+		MaxConnsPerHost:       50,
+		IdleConnTimeout:       120 * time.Second,
+		TLSHandshakeTimeout:   5 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		DisableCompression:    true,
+		WriteBufferSize:       128 * 1024,
+		ReadBufferSize:        128 * 1024,
+		ForceAttemptHTTP2:     false,
+	},
+}
+
 func (s *service) FileDownload() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var req = new(fileDownloadRequest)
 
 		if err := ctx.ShouldBindQuery(req); err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": err.Error(),
+			s.logger.Warn("文件下载请求参数错误", zap.Error(err))
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: err.Error(),
 			})
 
 			return
 		}
 
 		if req.TimeStamp != -1 && req.TimeStamp < time.Now().Unix() {
-			ctx.JSON(http.StatusUnauthorized, gin.H{
-				"code":    http.StatusUnauthorized,
-				"message": "timeStamp is expired",
+			s.logger.Warn("文件下载请求时间戳已过期",
+				zap.Int64("timestamp", req.TimeStamp),
+				zap.Int64("fileId", req.ID))
+			ctx.JSON(http.StatusUnauthorized, types.ErrResponse{
+				Code:    http.StatusUnauthorized,
+				Message: "请求时间戳已过期",
 			})
 
 			return
 		}
 
 		key := shared.Setting.SaltKey
-
 		values := url.Values{
 			"id":        []string{strconv.FormatInt(req.ID, 10)},
 			"timestamp": []string{strconv.FormatInt(req.TimeStamp, 10)},
@@ -63,9 +93,12 @@ func (s *service) FileDownload() gin.HandlerFunc {
 		}
 
 		if !verify(values, key) {
-			ctx.JSON(http.StatusUnauthorized, gin.H{
-				"code":    http.StatusUnauthorized,
-				"message": "sign is invalid",
+			s.logger.Warn("文件下载请求签名验证失败",
+				zap.Int64("fileId", req.ID),
+				zap.String("sign", req.Sign))
+			ctx.JSON(http.StatusUnauthorized, types.ErrResponse{
+				Code:    http.StatusUnauthorized,
+				Message: "签名验证失败",
 			})
 
 			return
@@ -73,7 +106,6 @@ func (s *service) FileDownload() gin.HandlerFunc {
 
 		if v, ok := s.cache.Get(fmt.Sprintf("file::url::%d", req.ID)); ok {
 			ctx.Header("X-Download-Url-Cache", "true")
-
 			s.doResponse(ctx, v.(string))
 
 			return
@@ -81,151 +113,114 @@ func (s *service) FileDownload() gin.HandlerFunc {
 
 		file := &models.VirtualFile{}
 		if err := s.db.WithContext(ctx).Where("id = ?", req.ID).First(file).Error; err != nil {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"code":    http.StatusNotFound,
-				"message": "file not found",
+			s.logger.Error("查询文件信息失败", zap.Int64("fileId", req.ID), zap.Error(err))
+			ctx.JSON(http.StatusNotFound, types.ErrResponse{
+				Code:    http.StatusNotFound,
+				Message: "文件未找到",
 			})
 
 			return
 		}
 
 		if file.OsType == models.OsTypeRealFile {
-			v, ok := file.Addition["file_path"]
-			if !ok {
-				ctx.JSON(http.StatusInternalServerError, gin.H{
-					"code":    http.StatusInternalServerError,
-					"message": "文件路径不存在",
-				})
-				return
-			}
-
-			filePath := v.(string)
-			fullPath := path.Join(configs.GetConfig().FileDir, filePath)
-
-			// 检查文件是否存在
-			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-				ctx.JSON(http.StatusNotFound, gin.H{
-					"code":    http.StatusNotFound,
-					"message": "文件不存在",
-				})
-				return
-			}
-
-			filename := file.Name
-
-			// 设置下载文件名
-			ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s", filename, url.QueryEscape(filename)))
-			
-			ctx.File(fullPath)
+			s.handleRealFileDownload(ctx, file, req.ID)
 
 			return
 		}
 
-		_result, err, _ := s.g.Do(fmt.Sprintf("file::url::%d", req.ID), func() (interface{}, error) {
-			u, httpCode, err := s.getFileDownloadURL(ctx, req.ID)
-
-			return &DoResult{
-				Content:  u,
-				HttpCode: httpCode,
-				Err:      err,
-			}, nil
-		})
-
-		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"code":    http.StatusInternalServerError,
-				"message": err.Error(),
-			})
-
-			return
-		}
-
-		result := _result.(*DoResult)
-
-		if result.Err != nil {
-			ctx.JSON(result.HttpCode, gin.H{
-				"code":    result.HttpCode,
-				"message": result.Err.Error(),
-			})
-
-			return
-		}
-
-		if result.HttpCode == http.StatusOK {
-			ctx.String(http.StatusOK, result.Content)
-
-			return
-		}
-
-		s.doResponse(ctx, result.Content)
+		s.handleCloudFileDownload(ctx, req.ID)
 	}
 }
 
-// 全局HTTP客户端，复用连接
-var globalHTTPClient = &http.Client{
-	Timeout: 0,
-	Transport: &http.Transport{
-		DisableKeepAlives:     false,
-		MaxIdleConns:          200, // 增加连接池
-		MaxIdleConnsPerHost:   20,  // 每个host更多连接
-		MaxConnsPerHost:       50,  // 总连接数限制
-		IdleConnTimeout:       120 * time.Second,
-		TLSHandshakeTimeout:   5 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-		DisableCompression:    true,       // 禁用压缩
-		WriteBufferSize:       128 * 1024, // 128KB写缓冲
-		ReadBufferSize:        128 * 1024, // 128KB读缓冲
-		ForceAttemptHTTP2:     false,      // 禁用HTTP2
-	},
+func (s *service) handleRealFileDownload(ctx *gin.Context, file *models.VirtualFile, fileID int64) {
+	v, ok := file.Addition[consts.FileAdditionKeyFilePath]
+	if !ok {
+		s.logger.Error("真实文件路径信息缺失",
+			zap.Int64("fileId", fileID),
+			zap.String("fileName", file.Name))
+		ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+			Code:    http.StatusInternalServerError,
+			Message: "文件路径不存在",
+		})
+
+		return
+	}
+
+	filePath := v.(string)
+	fullPath := path.Join(configs.GetConfig().FileDir, filePath)
+
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		s.logger.Error("真实文件不存在",
+			zap.Int64("fileId", fileID),
+			zap.String("fileName", file.Name),
+			zap.String("fullPath", fullPath))
+		ctx.JSON(http.StatusNotFound, types.ErrResponse{
+			Code:    http.StatusNotFound,
+			Message: "文件不存在",
+		})
+
+		return
+	}
+
+	filename := file.Name
+	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s",
+		filename, url.QueryEscape(filename)))
+
+	s.logger.Info("开始下载真实文件",
+		zap.Int64("fileId", fileID),
+		zap.String("fileName", file.Name),
+		zap.String("fullPath", fullPath))
+
+	ctx.File(fullPath)
+}
+
+func (s *service) handleCloudFileDownload(ctx *gin.Context, fileID int64) {
+	_result, err, _ := s.g.Do(fmt.Sprintf("file::url::%d", fileID), func() (interface{}, error) {
+		u, httpCode, err := s.getFileDownloadURL(ctx, fileID)
+
+		return &DoResult{
+			Content:  u,
+			HttpCode: httpCode,
+			Err:      err,
+		}, nil
+	})
+
+	if err != nil {
+		s.logger.Error("获取文件下载链接失败", zap.Int64("fileId", fileID), zap.Error(err))
+		ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+			Code:    http.StatusInternalServerError,
+			Message: err.Error(),
+		})
+
+		return
+	}
+
+	result := _result.(*DoResult)
+	if result.Err != nil {
+		s.logger.Error("处理文件下载请求失败",
+			zap.Int64("fileId", fileID),
+			zap.Int("httpCode", result.HttpCode),
+			zap.Error(result.Err))
+		ctx.JSON(result.HttpCode, types.ErrResponse{
+			Code:    result.HttpCode,
+			Message: result.Err.Error(),
+		})
+
+		return
+	}
+
+	if result.HttpCode == http.StatusOK {
+		ctx.String(http.StatusOK, result.Content)
+
+		return
+	}
+
+	s.doResponse(ctx, result.Content)
 }
 
 func (s *service) doResponse(ctx *gin.Context, url string) {
 	if shared.Setting.MultipleStream {
-		ctx.Header("X-Transfer-Type", "multi_stream")
-		ctx.Header("X-Transfer-Chunk-Size", strconv.FormatInt(shared.MultipleStreamChunkSize, 10))
-		ctx.Header("X-Transfer-Chunk-Size-Format", utils.FormatBytes(shared.MultipleStreamChunkSize))
-		ctx.Header("X-Transfer-Thread-Count", strconv.Itoa(shared.MultipleStreamThreadCount))
-
-		httpReq := ctx.Request.Header.Clone()
-		httpReq.Set("Accept-Encoding", "identity")
-		httpReq.Del("Content-Type")
-
-		streamer, err := multistreamer.NewStreamer(ctx,
-			url,
-			httpReq,
-			multistreamer.WithLogger(s.logger),
-			multistreamer.WithThreads(shared.MultipleStreamThreadCount),
-			multistreamer.WithChunkSize(shared.MultipleStreamChunkSize),
-		)
-		if err != nil {
-			s.logger.Error("初始化失败", zap.Error(err), zap.String("url", url))
-
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"code":    http.StatusInternalServerError,
-				"message": fmt.Sprintf("初始化失败: %v", err),
-			})
-
-			return
-		}
-
-		for k, v := range streamer.GetResponseHeader() {
-			ctx.Header(k, v[0])
-		}
-
-		ctx.Status(streamer.HTTPCode())
-
-		if err = streamer.Transfer(ctx, ctx.Writer); err != nil {
-			if s.isConnectionError(err) {
-				s.logger.Info("客户端连接断开",
-					zap.String("url", url),
-				)
-			} else {
-				s.logger.Error("文件下载转发失败",
-					zap.Error(err),
-					zap.String("url", url),
-				)
-			}
-		}
+		s.handleMultiStreamResponse(ctx, url)
 	} else if shared.Setting.LocalProxy {
 		s.handleLocalProxy(ctx, url)
 	} else {
@@ -234,107 +229,131 @@ func (s *service) doResponse(ctx *gin.Context, url string) {
 	}
 }
 
-// 单独处理 LocalProxy 逻辑
+func (s *service) handleMultiStreamResponse(ctx *gin.Context, url string) {
+	ctx.Header("X-Transfer-Type", "multi_stream")
+	ctx.Header("X-Transfer-Chunk-Size", strconv.FormatInt(shared.MultipleStreamChunkSize, 10))
+	ctx.Header("X-Transfer-Chunk-Size-Format", utils.FormatBytes(shared.MultipleStreamChunkSize))
+	ctx.Header("X-Transfer-Thread-Count", strconv.Itoa(shared.MultipleStreamThreadCount))
+
+	httpReq := ctx.Request.Header.Clone()
+	httpReq.Set("Accept-Encoding", "identity")
+	httpReq.Del("Content-Type")
+
+	streamer, err := multistreamer.NewStreamer(ctx,
+		url,
+		httpReq,
+		multistreamer.WithLogger(s.logger),
+		multistreamer.WithThreads(shared.MultipleStreamThreadCount),
+		multistreamer.WithChunkSize(shared.MultipleStreamChunkSize),
+	)
+	if err != nil {
+		s.logger.Error("多线程流初始化失败", zap.Error(err), zap.String("url", url))
+		ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+			Code:    http.StatusInternalServerError,
+			Message: fmt.Sprintf("多线程流初始化失败: %v", err),
+		})
+
+		return
+	}
+
+	for k, v := range streamer.GetResponseHeader() {
+		ctx.Header(k, v[0])
+	}
+
+	ctx.Status(streamer.HTTPCode())
+
+	if err = streamer.Transfer(ctx, ctx.Writer); err != nil {
+		if s.isConnectionError(err) {
+			s.logger.Info("客户端连接断开", zap.String("url", url))
+		} else {
+			s.logger.Error("多线程流文件传输失败", zap.Error(err), zap.String("url", url))
+		}
+	}
+}
+
 func (s *service) handleLocalProxy(ctx *gin.Context, url string) {
 	start := time.Now()
 	ctx.Header("X-Transfer-Type", "local_proxy")
 
-	// 使用请求的上下文，支持取消
 	req, err := http.NewRequestWithContext(ctx.Request.Context(), http.MethodGet, url, nil)
 	if err != nil {
-		s.logger.Error("创建代理请求失败", zap.Error(err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"code":    http.StatusInternalServerError,
-			"message": err.Error(),
+		s.logger.Error("创建本地代理请求失败", zap.Error(err), zap.String("url", url))
+		ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+			Code:    http.StatusInternalServerError,
+			Message: err.Error(),
 		})
+
 		return
 	}
 
-	// 智能复制请求头
 	s.copyOptimizedHeaders(ctx.Request.Header, req.Header)
 
-	// 检查是否是Range请求
 	rangeHeader := ctx.Request.Header.Get("Range")
 	isRangeRequest := rangeHeader != ""
 
 	if isRangeRequest {
-		// Range请求使用更激进的优化
 		req.Header.Set("Connection", "keep-alive")
 	}
 
-	// 发送请求
 	resp, err := globalHTTPClient.Do(req)
 	if err != nil {
-		// 检查是否是上下文取消（客户端断开）
 		if ctx.Request.Context().Err() != nil {
 			s.logger.Info("客户端断开连接", zap.String("url", url))
+
 			return
 		}
 
-		s.logger.Error("代理请求失败", zap.Error(err), zap.String("url", url))
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"code":    http.StatusInternalServerError,
-			"message": fmt.Sprintf("代理请求失败: %v", err),
+		s.logger.Error("本地代理请求失败", zap.Error(err), zap.String("url", url))
+		ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+			Code:    http.StatusInternalServerError,
+			Message: fmt.Sprintf("本地代理请求失败: %v", err),
 		})
+
 		return
 	}
 	defer resp.Body.Close()
 
-	// 优化响应头复制
 	s.copyOptimizedResponseHeaders(resp.Header, ctx)
-
 	ctx.Status(resp.StatusCode)
 
-	// 立即刷新响应头
 	if flusher, ok := ctx.Writer.(http.Flusher); ok {
 		flusher.Flush()
 	}
 
-	// 根据请求类型选择不同的传输策略
 	var copyErr error
-	if isRangeRequest || resp.ContentLength < 1024*1024 { // 小于1MB
-		// 小文件或Range请求：快速传输
+	if isRangeRequest || resp.ContentLength < 1024*1024 {
 		copyErr = s.fastCopy(ctx, ctx.Writer, resp.Body)
 	} else {
-		// 大文件：流式传输
 		copyErr = s.streamCopy(ctx, ctx.Writer, resp.Body)
 	}
 
-	// 性能监控
 	duration := time.Since(start)
 	if copyErr != nil {
 		if s.isConnectionError(copyErr) {
 			s.logger.Info("客户端连接断开",
 				zap.String("url", url),
-				zap.Duration("duration", duration),
-			)
+				zap.Duration("duration", duration))
 		} else {
-			s.logger.Error("文件下载转发失败",
+			s.logger.Error("本地代理文件传输失败",
 				zap.Error(copyErr),
 				zap.String("url", url),
-				zap.Duration("duration", duration),
-			)
+				zap.Duration("duration", duration))
 		}
 	} else {
-		s.logger.Info("代理请求完成",
+		s.logger.Info("本地代理请求完成",
 			zap.String("url", url),
 			zap.Duration("duration", duration),
-			zap.String("user_agent", ctx.Request.UserAgent()),
-		)
+			zap.String("user_agent", ctx.Request.UserAgent()))
 
-		// 如果超过5秒，记录警告
 		if duration > 5*time.Second {
-			s.logger.Warn("代理请求较慢",
+			s.logger.Warn("本地代理请求响应较慢",
 				zap.String("url", url),
-				zap.Duration("duration", duration),
-			)
+				zap.Duration("duration", duration))
 		}
 	}
 }
 
-// 优化的请求头复制
 func (s *service) copyOptimizedHeaders(src, dst http.Header) {
-	// 只复制必要的头
 	importantHeaders := []string{
 		"Range", "If-Range", "If-Modified-Since", "If-None-Match",
 		"User-Agent", "Accept", "Accept-Encoding", "Authorization",
@@ -348,9 +367,7 @@ func (s *service) copyOptimizedHeaders(src, dst http.Header) {
 	}
 }
 
-// 优化的响应头复制
 func (s *service) copyOptimizedResponseHeaders(src http.Header, ctx *gin.Context) {
-	// 重要的响应头
 	importantHeaders := []string{
 		"Content-Type", "Content-Length", "Content-Range",
 		"Accept-Ranges", "Last-Modified", "ETag", "Cache-Control",
@@ -363,15 +380,12 @@ func (s *service) copyOptimizedResponseHeaders(src http.Header, ctx *gin.Context
 		}
 	}
 
-	// 添加性能优化头
 	ctx.Header("Connection", "keep-alive")
 	ctx.Header("Keep-Alive", "timeout=120, max=100")
 }
 
-// 快速复制（小文件）
 func (s *service) fastCopy(ctx *gin.Context, dst io.Writer, src io.Reader) error {
-	// 使用更大的缓冲区一次性读取
-	buf := make([]byte, 256*1024) // 256KB
+	buf := make([]byte, 256*1024)
 	_, err := io.CopyBuffer(dst, src, buf)
 
 	if flusher, ok := dst.(http.Flusher); ok {
@@ -381,9 +395,7 @@ func (s *service) fastCopy(ctx *gin.Context, dst io.Writer, src io.Reader) error
 	return err
 }
 
-// 优化的流式复制
 func (s *service) streamCopy(ctx *gin.Context, dst io.Writer, src io.Reader) error {
-	// 使用更大的缓冲区 (128KB)
 	buf := make([]byte, 128*1024)
 	flusher, canFlush := dst.(http.Flusher)
 
@@ -391,14 +403,12 @@ func (s *service) streamCopy(ctx *gin.Context, dst io.Writer, src io.Reader) err
 	flushInterval := 0
 
 	for {
-		// 检查连接状态
 		select {
 		case <-ctx.Request.Context().Done():
 			return ctx.Request.Context().Err()
 		default:
 		}
 
-		// 设置读取超时
 		if conn, ok := src.(interface{ SetReadDeadline(time.Time) error }); ok {
 			conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 		}
@@ -416,7 +426,6 @@ func (s *service) streamCopy(ctx *gin.Context, dst io.Writer, src io.Reader) err
 			written += int64(nw)
 			flushInterval++
 
-			// 每16KB或每10次写入就刷新一次
 			if canFlush && (flushInterval%10 == 0 || written%16384 == 0) {
 				flusher.Flush()
 			}
@@ -430,7 +439,6 @@ func (s *service) streamCopy(ctx *gin.Context, dst io.Writer, src io.Reader) err
 		}
 	}
 
-	// 最终刷新
 	if canFlush {
 		flusher.Flush()
 	}
@@ -438,7 +446,6 @@ func (s *service) streamCopy(ctx *gin.Context, dst io.Writer, src io.Reader) err
 	return nil
 }
 
-// 检查是否是连接相关的错误
 func (s *service) isConnectionError(err error) bool {
 	if err == nil {
 		return false
@@ -467,24 +474,18 @@ func (s *service) isConnectionError(err error) bool {
 	return false
 }
 
-// ConnectionMonitorMiddleware 连接监控中间件
 func (s *service) ConnectionMonitorMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		// 创建一个可以取消的上下文
 		ctxWithCancel, cancel := context.WithCancel(ctx.Request.Context())
 		defer cancel()
 
-		// 替换请求上下文
 		ctx.Request = ctx.Request.WithContext(ctxWithCancel)
 
-		// 使用 recover 捕获 panic
 		defer func() {
 			if r := recover(); r != nil {
 				if s.isConnectionError(fmt.Errorf("%v", r)) {
-					// 连接断开导致的 panic，记录日志但不报错
 					s.logger.Info("连接断开导致的异常", zap.Any("error", r))
 				} else {
-					// 其他 panic 正常处理
 					s.logger.Error("处理请求时发生异常", zap.Any("error", r))
 					if !ctx.Writer.Written() {
 						ctx.AbortWithStatus(http.StatusInternalServerError)
@@ -497,80 +498,130 @@ func (s *service) ConnectionMonitorMiddleware() gin.HandlerFunc {
 	}
 }
 
-type DoResult struct {
-	Content  string
-	HttpCode int
-	Err      error
-}
-
 func (s *service) getFileDownloadURL(ctx context.Context, id int64) (string, int, error) {
 	var file = new(models.VirtualFile)
 	if err := s.db.WithContext(ctx).Where("id", id).First(file).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", http.StatusNotFound, errors.New("file not found")
+			s.logger.Warn("获取下载链接时文件未找到", zap.Int64("fileId", id))
+
+			return "", http.StatusNotFound, errors.New("文件未找到")
 		}
+
+		s.logger.Error("查询文件信息失败", zap.Int64("fileId", id), zap.Error(err))
 
 		return "", http.StatusInternalServerError, err
 	}
 
 	if file.OsType == models.OsTypeStrmFile {
+		s.logger.Info("生成STRM文件下载链接",
+			zap.Int64("fileId", id),
+			zap.Int64("linkId", file.LinkId))
+
 		return s.generateDownloadURLWithNeverExpire(file.LinkId), http.StatusOK, nil
 	}
 
-	var cloudTokenId int64
-
-	var scanFile = file
-
-	for {
-		if v, ok := scanFile.Addition["cloud_token"]; ok {
-			cloudTokenId, _ = utils.Int64(v)
-
-			break
-		}
-
-		if scanFile.ParentId == 0 {
-			return "", http.StatusBadRequest, errors.New("当前资源没有绑定用于获取播放链接的令牌")
-		}
-
-		var parent = new(models.VirtualFile)
-		if err := s.db.WithContext(ctx).Where("id", scanFile.ParentId).First(parent).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return "", http.StatusNotFound, errors.New("file not found")
-			}
-
-			return "", http.StatusBadRequest, errors.New("当前资源没有绑定用于获取播放链接的令牌")
-		}
-
-		scanFile = parent
+	cloudTokenId, err := s.findCloudTokenId(ctx, file)
+	if err != nil {
+		return "", http.StatusBadRequest, err
 	}
 
-	var ct = new(models.CloudToken)
+	ct := new(models.CloudToken)
 	if err := s.db.WithContext(ctx).Where("id", cloudTokenId).First(ct).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			s.logger.Error("云盘令牌未找到",
+				zap.Int64("fileId", id),
+				zap.Int64("cloudTokenId", cloudTokenId))
+
 			return "", http.StatusBadRequest, errors.New("绑定的令牌查找失败，可能被删除或隐藏")
 		}
+
+		s.logger.Error("查询云盘令牌失败",
+			zap.Int64("fileId", id),
+			zap.Int64("cloudTokenId", cloudTokenId),
+			zap.Error(err))
 
 		return "", http.StatusInternalServerError, err
 	}
 
-	fileId := utils.String(file.Addition["file_id"])
+	fileId := utils.String(file.Addition[consts.FileAdditionKeyFileId])
+	s.logger.Info("开始获取云盘文件下载链接",
+		zap.Int64("fileId", id),
+		zap.String("cloudFileId", fileId))
 
-	result, err := client.New().WithToken(client.NewAuthToken(ct.AccessToken, ct.ExpiresIn)).GetFileDownload(ctx, client.String(fileId), func(req *client.GetFileDownloadRequest) {
-		if v, ok := file.Addition["share_id"]; ok {
-			req.ShareId, _ = utils.Int64(v)
-		}
-	})
+	result, err := client.New().WithToken(client.NewAuthToken(ct.AccessToken, ct.ExpiresIn)).
+		GetFileDownload(ctx, client.String(fileId), func(req *client.GetFileDownloadRequest) {
+			if v, ok := file.Addition["share_id"]; ok {
+				req.ShareId, _ = utils.Int64(v)
+			}
+		})
 
 	if err != nil {
+		s.logger.Error("获取云盘文件下载链接失败",
+			zap.Int64("fileId", id),
+			zap.String("cloudFileId", fileId),
+			zap.Error(err))
+
 		return "", http.StatusInternalServerError, err
 	}
 
 	resp, err := http.Get(result.FileDownloadUrl)
 	if err != nil {
+		s.logger.Error("请求云盘下载链接失败",
+			zap.Int64("fileId", id),
+			zap.String("downloadUrl", result.FileDownloadUrl),
+			zap.Error(err))
+
 		return "", http.StatusInternalServerError, err
 	}
 
-	s.cache.Set(fmt.Sprintf("file::url::%d", file.ID), resp.Request.URL.String(), time.Minute)
+	finalUrl := resp.Request.URL.String()
+	s.cache.Set(fmt.Sprintf("file::url::%d", file.ID), finalUrl, time.Minute)
 
-	return resp.Request.URL.String(), http.StatusFound, nil
+	s.logger.Info("成功获取文件下载链接",
+		zap.Int64("fileId", id),
+		zap.String("finalUrl", finalUrl))
+
+	return finalUrl, http.StatusFound, nil
+}
+
+func (s *service) findCloudTokenId(ctx context.Context, file *models.VirtualFile) (int64, error) {
+	var cloudTokenId int64
+	scanFile := file
+
+	for {
+		if v, ok := scanFile.Addition[consts.FileAdditionKeyCloudToken]; ok {
+			cloudTokenId, _ = utils.Int64(v)
+			break
+		}
+
+		if scanFile.ParentId == 0 {
+			s.logger.Error("文件未绑定云盘令牌",
+				zap.Int64("fileId", file.ID),
+				zap.String("fileName", file.Name))
+
+			return 0, errors.New("当前资源没有绑定用于获取播放链接的令牌")
+		}
+
+		var parent = new(models.VirtualFile)
+		if err := s.db.WithContext(ctx).Where("id", scanFile.ParentId).First(parent).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				s.logger.Error("查找父级文件失败",
+					zap.Int64("fileId", file.ID),
+					zap.Int64("parentId", scanFile.ParentId))
+
+				return 0, errors.New("文件未找到")
+			}
+
+			s.logger.Error("查询父级文件信息失败",
+				zap.Int64("fileId", file.ID),
+				zap.Int64("parentId", scanFile.ParentId),
+				zap.Error(err))
+
+			return 0, errors.New("当前资源没有绑定用于获取播放链接的令牌")
+		}
+
+		scanFile = parent
+	}
+
+	return cloudTokenId, nil
 }

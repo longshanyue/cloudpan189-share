@@ -3,6 +3,10 @@ package fs
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
@@ -10,9 +14,6 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/datatypes"
 	"gorm.io/gorm/clause"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
 func (f *fs) Create(ctx context.Context, pid int64, file File) (id int64, err error) {
@@ -62,7 +63,7 @@ func (f *fs) BatchCreate(ctx context.Context, pid int64, files ...File) (count i
 		Columns:   []clause.Column{{Name: "parent_id"}, {Name: "name"}},
 		DoNothing: true,
 	}).CreateInBatches(files, len(files)); result.Error != nil {
-		f.logger.Error("批量创建文件失败", zap.Error(err))
+		f.logger.Error("批量创建文件失败", zap.Error(result.Error))
 
 		return 0, result.Error
 	} else {

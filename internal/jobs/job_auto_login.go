@@ -51,7 +51,7 @@ func (s *AutoLoginJob) Start(ctx context.Context) error {
 
 			// 查询过期时间还剩7天的 token
 			var tokens = make([]*models.CloudToken, 0)
-			if err := s.db.WithContext(ctx).Where("login_type = ?", models.LoginTypePassword).Where("expires_in < ?", time.Now().Unix()-7*24*3600).Find(&tokens).Error; err != nil {
+			if err := s.db.WithContext(ctx).Where("login_type = ?", models.LoginTypePassword).Where("expires_in < ?", time.Now().Unix()+7*24*3600).Find(&tokens).Error; err != nil {
 				s.logger.Error("query cloud token error", zap.Error(err))
 
 				continue

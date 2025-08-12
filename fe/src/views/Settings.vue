@@ -338,6 +338,23 @@
         </div>
       </div>
 
+      <!-- 清空本地真实存储 -->
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">清空本地真实存储</span>
+          <span class="label-desc">清空所有本地真实存储的文件，包括 Emby 生成的 nfo 等文件，此操作不可逆，请谨慎使用。此功能不会影响挂载的分享文件和虚拟文件。</span>
+        </div>
+        <div class="setting-control">
+          <button
+              @click="handleClearRealFile"
+              class="btn btn-danger btn-sm"
+              :disabled="loading"
+          >
+            {{ loading ? '清空中...' : '清空本地真实存储' }}
+          </button>
+        </div>
+      </div>
+
       <div class="setting-item">
         <div class="setting-label">
           <span class="label-text">API密钥</span>
@@ -429,6 +446,7 @@ import SectionDivider from '@/components/SectionDivider.vue'
 import SubsectionTitle from '@/components/SubsectionTitle.vue'
 import { toast } from '@/utils/toast'
 import { confirmDialog } from '@/utils/confirm'
+import { storageApi } from '@/api/storage'
 
 const settingStore = useSettingStore()
 
@@ -991,6 +1009,32 @@ const saveStrmExtensions = async () => {
     toast.error('保存STRM支持文件格式失败')
   } finally {
     modalLoading.value = false
+  }
+}
+
+// 清空本地真实存储
+const handleClearRealFile = async () => {
+  const confirmed = await confirmDialog({
+    title: '清空本地真实存储',
+    message: '确定要清空所有本地真实存储的文件吗？包括 Emby 生成的 nfo 等文件，此操作不可逆，请谨慎使用。此功能不会影响挂载的分享文件和虚拟文件。',
+    confirmText: '确认清空',
+    cancelText: '取消',
+    isDanger: true
+  })
+
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    loading.value = true
+    const response = await storageApi.clearRealFile()
+    toast.success(response.message)
+  } catch (error) {
+    console.error('清空本地真实存储失败:', error)
+    toast.error('清空本地真实存储失败')
+  } finally {
+    loading.value = false
   }
 }
 

@@ -11,15 +11,19 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/xxcheng123/cloudpan189-share/internal/types"
+	"go.uber.org/zap"
 )
 
 func (s *service) responseDav(ctx *gin.Context, fileInfo *FileInfo) {
 	switch ctx.Request.Method {
 	case "GET", "HEAD", "POST":
 		if fileInfo.IsFolder == 1 {
-			ctx.JSON(http.StatusMethodNotAllowed, gin.H{
-				"code":    http.StatusMethodNotAllowed,
-				"message": "Method not allowed",
+			s.logger.Warn("尝试对文件夹执行不支持的操作", zap.String("method", ctx.Request.Method), zap.String("path", ctx.Request.URL.Path))
+
+			ctx.JSON(http.StatusMethodNotAllowed, types.ErrResponse{
+				Code:    http.StatusMethodNotAllowed,
+				Message: "文件夹不支持此操作",
 			})
 
 			return
@@ -291,8 +295,10 @@ func (s *service) lock(now time.Time, root string) (token string, status int, er
 	})
 	if err != nil {
 		if errors.Is(err, webdav.ErrLocked) {
+			s.logger.Warn("资源已被锁定", zap.String("root", root), zap.Error(err))
 			return "", webdav.StatusLocked, err
 		}
+		s.logger.Error("创建锁失败", zap.String("root", root), zap.Error(err))
 		return "", http.StatusInternalServerError, err
 	}
 	return token, 0, nil
@@ -303,6 +309,7 @@ func (s *service) confirmLocks(src, dst string) (release func(), status int, err
 	if src != "" {
 		srcToken, status, err = s.lock(now, src)
 		if err != nil {
+			s.logger.Error("锁定源路径失败", zap.String("src", src), zap.Error(err))
 			return nil, status, err
 		}
 	}
@@ -312,16 +319,21 @@ func (s *service) confirmLocks(src, dst string) (release func(), status int, err
 			if srcToken != "" {
 				_ = s.LockSystem.Unlock(now, srcToken)
 			}
+			s.logger.Error("锁定目标路径失败", zap.String("dst", dst), zap.Error(err))
 			return nil, status, err
 		}
 	}
 
 	return func() {
 		if dstToken != "" {
-			_ = s.LockSystem.Unlock(now, dstToken)
+			if err := s.LockSystem.Unlock(now, dstToken); err != nil {
+				s.logger.Warn("解锁目标路径失败", zap.String("dst", dst), zap.String("token", dstToken), zap.Error(err))
+			}
 		}
 		if srcToken != "" {
-			_ = s.LockSystem.Unlock(now, srcToken)
+			if err := s.LockSystem.Unlock(now, srcToken); err != nil {
+				s.logger.Warn("解锁源路径失败", zap.String("src", src), zap.String("token", srcToken), zap.Error(err))
+			}
 		}
 	}, 0, nil
 }

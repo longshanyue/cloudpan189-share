@@ -31,6 +31,12 @@ export interface GetFileRequest {
   includeAutoGenerateStrmFile?: boolean // 是否包括STRM文件
 }
 
+// 删除文件响应接口
+export interface DeleteFileResponse {
+  code: number
+  message: string
+}
+
 // 文件API
 export const fileApi = {
   // 获取文件/文件夹信息
@@ -60,5 +66,18 @@ export const fileApi = {
     }
 
     return api.get(url)
+  },
+
+  // 删除文件/文件夹
+  deleteFile: (path: string): Promise<DeleteFileResponse> => {
+    if (!path) {
+      throw new Error('删除路径不能为空')
+    }
+
+    // 对路径进行编码，但保留路径分隔符
+    const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/')
+    const url = `/open_file/${encodedPath}`
+
+    return api.delete(url)
   }
 }

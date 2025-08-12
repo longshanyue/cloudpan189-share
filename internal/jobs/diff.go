@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
+
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/samber/lo"
 	"github.com/xxcheng123/cloudpan189-interface/client"
@@ -13,8 +16,6 @@ import (
 	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"strings"
-	"sync"
 )
 
 var (
@@ -162,8 +163,8 @@ func (w *diffWorker) execute(ctx context.Context, file File, deep bool) (err err
 	var errs = make([]error, 0)
 
 	// 新增文件
-	if len(filesToDelete) > 0 {
-		count, err := w.fs.BatchCreate(ctx, file.ID, filesToDelete...)
+	if len(filesToCreate) > 0 {
+		count, err := w.fs.BatchCreate(ctx, file.ID, filesToCreate...)
 		if err != nil {
 			w.logger.Error("批量创建子文件失败",
 				zap.Error(err),
@@ -186,7 +187,7 @@ func (w *diffWorker) execute(ctx context.Context, file File, deep bool) (err err
 			w.logger.Error("更新文件失败",
 				zap.Error(err),
 				zap.String("file_name", item["name"].(string)),
-				zap.Int64("file_id", item["id"].(int64)))
+				zap.Int64("file_id", id))
 
 			errs = append(errs, fmt.Errorf("更新文件失败: %w", err))
 		} else {
@@ -710,7 +711,7 @@ func (w *diffWorker) getShareFiles(ctx context.Context, f File) ([]File, error) 
 
 				var pageFiles []File
 				for _, v := range subResp.FileListAO.FolderList {
-					files = append(files, &models.VirtualFile{
+					pageFiles = append(pageFiles, &models.VirtualFile{
 						ParentId:   f.ID,
 						Name:       v.Name,
 						IsTop:      0,
@@ -729,7 +730,7 @@ func (w *diffWorker) getShareFiles(ctx context.Context, f File) ([]File, error) 
 				}
 
 				for _, v := range subResp.FileListAO.FileList {
-					files = append(files, &models.VirtualFile{
+					pageFiles = append(pageFiles, &models.VirtualFile{
 						ParentId:   f.ID,
 						Name:       v.Name,
 						IsTop:      0,

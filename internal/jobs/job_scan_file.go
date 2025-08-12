@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/xxcheng123/cloudpan189-share/internal/fs"
 	"runtime/debug"
 	"sync"
 	"time"
+
+	"github.com/xxcheng123/cloudpan189-share/internal/fs"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/xxcheng123/cloudpan189-interface/client"
@@ -181,7 +182,7 @@ func (s *ScanFileJob) buildStrm(ctx context.Context, f *models.VirtualFile) erro
 
 	subFiles := make([]*models.VirtualFile, 0)
 
-	if err := s.db.WithContext(ctx).Where("parent_id", f.ID).Find(&subFiles).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("parent_id = ?", f.ID).Find(&subFiles).Error; err != nil {
 		return err
 	}
 

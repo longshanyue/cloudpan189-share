@@ -4,9 +4,11 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
 	"github.com/xxcheng123/cloudpan189-share/internal/shared"
+	"github.com/xxcheng123/cloudpan189-share/internal/types"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"net/http"
@@ -18,9 +20,9 @@ func (s *service) BaseMiddleware() gin.HandlerFunc {
 
 		paths, err := utils.SplitPath(rawPath)
 		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": err.Error(),
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: err.Error(),
 			})
 
 			ctx.Abort()
@@ -31,7 +33,7 @@ func (s *service) BaseMiddleware() gin.HandlerFunc {
 		var (
 			pid       int64
 			fid       int64
-			gid       = ctx.GetInt64("group_id")
+			gid       = ctx.GetInt64(consts.CtxKeyGroupId)
 			fullPaths = make([]string, 0)
 		)
 
@@ -43,11 +45,11 @@ func (s *service) BaseMiddleware() gin.HandlerFunc {
 			groupFiles := make([]*models.Group2File, 0)
 
 			if err = s.db.WithContext(ctx).Model(new(models.Group2File)).Where("group_id", gid).Find(&groupFiles).Error; err != nil {
-				s.logger.Error("get group files failure", zap.Error(err))
+				s.logger.Error("获取用户组文件关系失败", zap.Error(err))
 
-				ctx.JSON(http.StatusInternalServerError, gin.H{
-					"code":    http.StatusInternalServerError,
-					"message": "获取用户组文件关系失败",
+				ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+					Code:    http.StatusInternalServerError,
+					Message: "获取用户组文件关系失败",
 				})
 
 				ctx.Abort()
@@ -73,14 +75,16 @@ func (s *service) BaseMiddleware() gin.HandlerFunc {
 							// 取到父级目录的ID
 							pid = fid
 							fid = -1
-							ctx.Set("x_file_name", p)
+							ctx.Set(consts.CtxKeyFilename, p)
 
 							break
 						}
 
-						ctx.JSON(http.StatusNotFound, gin.H{
-							"code":    http.StatusNotFound,
-							"message": "file not found",
+						s.logger.Warn("文件未找到", zap.String("path", rawPath), zap.String("filename", p))
+
+						ctx.JSON(http.StatusNotFound, types.ErrResponse{
+							Code:    http.StatusNotFound,
+							Message: "文件未找到",
 						})
 
 						ctx.Abort()
@@ -88,9 +92,11 @@ func (s *service) BaseMiddleware() gin.HandlerFunc {
 						return
 					}
 
-					ctx.JSON(http.StatusBadRequest, gin.H{
-						"code":    http.StatusBadRequest,
-						"message": err.Error(),
+					s.logger.Error("查询文件失败", zap.Error(err), zap.String("path", rawPath), zap.String("filename", p))
+
+					ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+						Code:    http.StatusBadRequest,
+						Message: err.Error(),
 					})
 
 					ctx.Abort()
@@ -100,9 +106,11 @@ func (s *service) BaseMiddleware() gin.HandlerFunc {
 
 				if tmpFile.IsTop == 1 && gid != 0 && !groupFileSet.Contains(tmpFile.ID) {
 					// 没有权限
-					ctx.JSON(http.StatusForbidden, gin.H{
-						"code":    http.StatusForbidden,
-						"message": "no permission",
+					s.logger.Warn("用户无权限访问文件", zap.Int64("gid", gid), zap.Int64("fileId", tmpFile.ID), zap.String("filename", p))
+
+					ctx.JSON(http.StatusForbidden, types.ErrResponse{
+						Code:    http.StatusForbidden,
+						Message: "无权限访问",
 					})
 
 					ctx.Abort()
@@ -116,11 +124,11 @@ func (s *service) BaseMiddleware() gin.HandlerFunc {
 			}
 		}
 
-		ctx.Set("x_fid", fid)
-		ctx.Set("x_pid", pid)
-		ctx.Set("x_gid", gid)
-		ctx.Set("x_full_paths", fullPaths)
-		ctx.Set("x_group_file_set", groupFileSet)
+		ctx.Set(consts.CtxKeyFileId, fid)
+		ctx.Set(consts.CtxKeyParentId, pid)
+		ctx.Set(consts.CtxKeyGroupId, gid)
+		ctx.Set(consts.CtxKeyFullPaths, fullPaths)
+		ctx.Set(consts.CtxKeyGroupFileSet, groupFileSet)
 	}
 }
 
@@ -129,9 +137,11 @@ func (s *service) DavMiddleware() gin.HandlerFunc {
 		if ctx.GetHeader("Depth") == "" {
 			ctx.Request.Header.Add("Depth", "1")
 		} else if ctx.GetHeader("Depth") == "infinity" {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": "`infinity` is not allowed",
+			s.logger.Warn("不支持infinity深度查询", zap.String("userAgent", ctx.GetHeader("User-Agent")))
+
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: "不支持infinity深度查询",
 			})
 
 			ctx.Abort()
@@ -140,9 +150,11 @@ func (s *service) DavMiddleware() gin.HandlerFunc {
 		}
 
 		if ctx.GetHeader("X-Litmus") == "props: 3 (propfind_invalid2)" {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": "Invalid property name",
+			s.logger.Warn("无效的属性名称", zap.String("userAgent", ctx.GetHeader("User-Agent")))
+
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: "无效的属性名称",
 			})
 
 			ctx.Abort()
@@ -157,12 +169,16 @@ func (s *service) DavMiddleware() gin.HandlerFunc {
 			ctx.Next()
 		case "PUT", "DELETE":
 			if !shared.FileWritable {
-				ctx.JSON(http.StatusMethodNotAllowed, gin.H{
-					"code":    http.StatusMethodNotAllowed,
-					"message": "Method not allowed",
+				s.logger.Warn("文件写入功能已禁用", zap.String("method", ctx.Request.Method), zap.String("path", ctx.Request.URL.Path))
+
+				ctx.JSON(http.StatusMethodNotAllowed, types.ErrResponse{
+					Code:    http.StatusMethodNotAllowed,
+					Message: "文件写入功能已禁用",
 				})
 
 				ctx.Abort()
+
+				return
 			}
 
 			ctx.Next()
@@ -171,7 +187,7 @@ func (s *service) DavMiddleware() gin.HandlerFunc {
 			if shared.FileWritable {
 				allow += ", PUT, DELETE"
 			}
-			
+
 			ctx.Header("Allow", allow)
 			// http://www.webdav.org/specs/rfc4918.html#dav.compliance.classes
 			ctx.Header("DAV", "1, 2")
@@ -180,9 +196,11 @@ func (s *service) DavMiddleware() gin.HandlerFunc {
 
 			ctx.Abort()
 		default:
-			ctx.JSON(http.StatusMethodNotAllowed, gin.H{
-				"code":    http.StatusMethodNotAllowed,
-				"message": "Method not allowed",
+			s.logger.Warn("不支持的HTTP方法", zap.String("method", ctx.Request.Method), zap.String("path", ctx.Request.URL.Path))
+
+			ctx.JSON(http.StatusMethodNotAllowed, types.ErrResponse{
+				Code:    http.StatusMethodNotAllowed,
+				Message: "不支持的HTTP方法",
 			})
 
 			ctx.Abort()

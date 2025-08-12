@@ -18,10 +18,6 @@ const (
 	OsTypeStrmFile       = "strm_file"
 )
 
-func OsTypeAllowDelete(osType OsType) bool {
-	return osType == OsTypeRealFile || osType == OsTypeStrmFile
-}
-
 type VirtualFile struct {
 	ID         int64             `gorm:"primaryKey" json:"id"`
 	ParentId   int64             `gorm:"column:parent_id;type:bigint(20);not null;default:0;uniqueIndex:parent_name_unique" json:"parentId"`

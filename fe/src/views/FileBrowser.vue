@@ -76,8 +76,6 @@
             <div class="file-col-actions">操作</div>
           </div>
 
-
-
           <!-- 文件和文件夹列表 -->
           <div
               v-for="item in fileList"
@@ -98,6 +96,7 @@
             <div class="file-col-size">{{ formatFileSize(item.size) }}</div>
             <div class="file-col-date">{{ formatDate(item.modifyDate) }}</div>
             <div class="file-col-actions">
+              <!-- 下载按钮 -->
               <button
                   v-if="!item.isFolder && item.downloadURL"
                   @click.stop="downloadFile(item)"
@@ -106,6 +105,8 @@
               >
                 <Icons name="download" size="0.9rem" />
               </button>
+
+              <!-- 刷新索引按钮 -->
               <button
                   v-if="item.isFolder"
                   @click.stop="refreshFolderIndex(item)"
@@ -114,6 +115,17 @@
               >
                 <Icons name="refresh" size="0.9rem" />
                 <span>刷新索引</span>
+              </button>
+
+              <!-- 删除按钮 -->
+              <button
+                  @click.stop="confirmDelete(item)"
+                  class="action-btn-small delete-btn"
+                  :disabled="item.isTop === 1"
+                  :title="item.isTop === 1 ? '挂载点文件请在后台存储管理删除' : (item.isFolder ? '删除文件夹' : '删除文件')"
+              >
+                <Icons name="trash-2" size="0.9rem" />
+                <span>删除</span>
               </button>
             </div>
           </div>
@@ -236,6 +248,57 @@
       </div>
     </div>
 
+    <!-- 删除确认弹窗 -->
+    <div v-if="showDeleteModal" class="delete-modal-overlay" @click="closeDeleteModal">
+      <div class="delete-modal" @click.stop>
+        <div class="delete-modal-header">
+          <h3>确认删除</h3>
+          <button @click="closeDeleteModal" class="close-btn">
+            <Icons name="x" size="1.2rem" />
+          </button>
+        </div>
+
+        <div class="delete-modal-body">
+          <div class="delete-warning">
+            <Icons name="alert-triangle" size="2rem" class="warning-icon" />
+            <p>您确定要删除以下{{ deleteTarget?.isFolder ? '文件夹' : '文件' }}吗？</p>
+            <div class="delete-item-info">
+              <Icons
+                  :name="getFileIcon(deleteTarget)"
+                  size="1.5rem"
+                  class="file-icon"
+                  :class="{ 'folder-icon': deleteTarget?.isFolder }"
+              />
+              <span class="item-name">{{ deleteTarget?.name }}</span>
+            </div>
+            <div class="delete-warnings">
+              <p class="delete-note danger">
+                {{ deleteTarget?.isFolder ? '此操作将删除文件夹及其所有内容，' : '' }}删除后无法恢复，请谨慎操作！
+              </p>
+              <p class="delete-note warning">
+                <Icons name="info" size="1rem" class="info-icon" />
+                注意：如果您开启了定时同步或手动同步刷新功能，删除的文件可能会在下次同步时重新出现。
+              </p>
+            </div>
+          </div>
+
+          <div class="delete-actions">
+            <button @click="closeDeleteModal" class="cancel-btn">
+              取消
+            </button>
+            <button
+                @click="performDelete"
+                class="confirm-delete-btn"
+                :disabled="deleteLoading"
+            >
+              <Icons v-if="deleteLoading" name="loader" size="1rem" class="loading-icon" />
+              {{ deleteLoading ? '删除中...' : '确认删除' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 回到顶部按钮 -->
     <transition name="fade">
       <button
@@ -283,6 +346,10 @@ const searchCurrentPage = ref(1)
 const searchPageSize = ref(15)
 const searchPerformed = ref(false)
 
+// 删除相关数据
+const showDeleteModal = ref(false)
+const deleteTarget = ref<FileItem | null>(null)
+const deleteLoading = ref(false)
 
 // 计算属性
 const currentPath = computed(() => {
@@ -354,8 +421,67 @@ const downloadFile = (item: FileItem) => {
   }
 }
 
+// 删除相关方法
+const confirmDelete = (item: FileItem) => {
+  // 检查是否为挂载点文件
+  if (item.isTop === 1) {
+    toast.warning('挂载点文件请在后台存储管理删除')
+    return
+  }
+
+  deleteTarget.value = item
+  showDeleteModal.value = true
+}
+
+const closeDeleteModal = () => {
+  showDeleteModal.value = false
+  deleteTarget.value = null
+  deleteLoading.value = false
+}
+
+const performDelete = async () => {
+  if (!deleteTarget.value) return
+
+  deleteLoading.value = true
+
+  try {
+    // 构建文件路径
+    const itemPath = deleteTarget.value.path.startsWith('/')
+        ? deleteTarget.value.path.substring(1)
+        : deleteTarget.value.path
+
+    await fileApi.deleteFile(itemPath)
+
+    toast.success(`${deleteTarget.value.isFolder ? '文件夹' : '文件'}删除成功`)
+
+    // 关闭弹窗
+    closeDeleteModal()
+
+    // 刷新当前路径
+    await loadFile(currentPath.value)
+
+  } catch (error: any) {
+    console.error('删除失败:', error)
+
+    // 根据错误类型显示不同的提示信息
+    if (error.code === 400) {
+      toast.error(error.message || '删除失败，请检查文件权限')
+    } else if (error.code === 404) {
+      toast.error('文件不存在或已被删除')
+      // 文件不存在时也刷新列表
+      await loadFile(currentPath.value)
+    } else {
+      toast.error(error.message || '删除失败，请稍后重试')
+    }
+  } finally {
+    deleteLoading.value = false
+  }
+}
+
 // 获取文件图标
-const getFileIcon = (item: { isFolder: number; name: string}): string => {
+const getFileIcon = (item: { isFolder: number; name: string} | null): string => {
+  if (!item) return 'file'
+
   if (item.isFolder) {
     return 'folder'
   }
@@ -436,8 +562,6 @@ const refreshFolderIndex = async (item: FileItem) => {
     toast.error('刷新文件夹索引失败')
   }
 }
-
-
 
 // 截断文字
 const truncateText = (text: string, maxLength: number): string => {
@@ -686,6 +810,7 @@ onUnmounted(() => {
     opacity: 0.5;
   }
 }
+
 .file-browser {
   background: #f8fafc;
   padding: 1rem;
@@ -969,7 +1094,7 @@ onUnmounted(() => {
 
 .file-list-header {
   display: grid;
-  grid-template-columns: 1fr 120px 180px 80px;
+  grid-template-columns: 1fr 120px 180px 120px;
   gap: 1rem;
   padding: 1rem 1.5rem;
   background: #f9fafb;
@@ -981,7 +1106,7 @@ onUnmounted(() => {
 
 .file-item {
   display: grid;
-  grid-template-columns: 1fr 120px 180px 80px;
+  grid-template-columns: 1fr 120px 180px 120px;
   gap: 1rem;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid rgba(243, 244, 246, 0.5);
@@ -1047,7 +1172,7 @@ onUnmounted(() => {
 .file-col-actions {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.5rem;
 }
 
 .file-item:hover .file-col-size,
@@ -1059,14 +1184,16 @@ onUnmounted(() => {
   background: none;
   border: 1px solid #d1d5db;
   color: #6b7280;
-  padding: 0.25rem;
+  padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0.25rem;
   transition: all 0.2s;
-  margin-left: 0.25rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .action-btn-small:hover {
@@ -1085,6 +1212,24 @@ onUnmounted(() => {
   color: #2563eb;
 }
 
+/* 删除按钮样式 */
+.delete-btn {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.delete-btn:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.delete-btn:disabled {
+  border-color: #d1d5db;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -1099,98 +1244,6 @@ onUnmounted(() => {
 .empty-icon {
   margin-bottom: 1rem;
   opacity: 0.5;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .browser-header {
-    padding: 1rem;
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
-  }
-
-  .breadcrumb {
-    flex-wrap: wrap;
-  }
-
-  .file-list-header,
-  .file-item {
-    grid-template-columns: 1fr 80px;
-    gap: 0.5rem;
-  }
-
-  .file-col-size,
-  .file-col-date {
-    display: none;
-  }
-
-  .file-list-container {
-    padding: 1rem;
-  }
-}
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .file-browser {
-    padding: 1rem;
-  }
-
-  .browser-header {
-    flex-direction: column;
-    gap: 1rem;
-    padding: 1rem;
-  }
-
-  .breadcrumb {
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  .breadcrumb-item {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.8rem;
-  }
-
-  .file-item {
-    padding: 0.75rem 1rem;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-
-  .file-icon {
-    width: 2rem;
-    height: 2rem;
-  }
-
-  .file-name {
-    font-size: 0.9rem;
-  }
-
-  .file-col-size,
-  .file-col-date {
-    font-size: 0.8rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .file-browser {
-    padding: 0.5rem;
-  }
-
-  .browser-header {
-    padding: 0.75rem;
-  }
-
-  .breadcrumb-item {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.75rem;
-  }
-
-  .action-btn {
-    padding: 0.5rem 1rem;
-    font-size: 0.8rem;
-  }
 }
 
 /* 搜索弹窗样式 */
@@ -1478,6 +1531,189 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
+.search-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+.search-empty .empty-icon {
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+/* 删除确认弹窗样式 */
+.delete-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.delete-modal {
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  width: 100%;
+  max-width: 520px;
+  overflow: hidden;
+}
+
+.delete-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fef2f2;
+}
+
+.delete-modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.delete-modal-body {
+  padding: 1.5rem;
+}
+
+.delete-warning {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.warning-icon {
+  color: #f59e0b;
+  margin-bottom: 1rem;
+}
+
+.delete-warning > p {
+  color: #374151;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.delete-item-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+}
+
+.item-name {
+  font-weight: 500;
+  color: #1f2937;
+  font-size: 1rem;
+}
+
+.delete-warnings {
+  text-align: left;
+  margin-top: 1.5rem;
+}
+
+.delete-note {
+  margin: 0.75rem 0;
+  line-height: 1.5;
+  font-size: 0.875rem;
+}
+
+.delete-note.danger {
+  color: #dc2626;
+  font-weight: 500;
+  background: #fef2f2;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border-left: 4px solid #ef4444;
+}
+
+.delete-note.warning {
+  color: #92400e;
+  background: #fef3c7;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border-left: 4px solid #f59e0b;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.info-icon {
+  color: #f59e0b;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.delete-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.cancel-btn {
+  background: white;
+  border: 1px solid #d1d5db;
+  color: #374151;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.cancel-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.confirm-delete-btn {
+  background: #ef4444;
+  border: 1px solid #ef4444;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.confirm-delete-btn:hover:not(:disabled) {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.confirm-delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.loading-icon {
+  animation: spin 1s linear infinite;
+}
+
 /* 回到顶部按钮样式 */
 .back-to-top-btn {
   position: fixed;
@@ -1519,23 +1755,38 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-.search-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  color: #6b7280;
-  text-align: center;
-}
-
-.search-empty .empty-icon {
-  margin-bottom: 1rem;
-  opacity: 0.5;
-}
-
 /* 响应式设计 */
 @media (max-width: 768px) {
+  .file-browser {
+    padding: 1rem;
+  }
+
+  .modern-header {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .breadcrumb-nav {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .file-list-header,
+  .file-item {
+    grid-template-columns: 1fr 80px;
+    gap: 0.5rem;
+  }
+
+  .file-col-size,
+  .file-col-date {
+    display: none;
+  }
+
+  .file-list-container {
+    padding: 1rem;
+  }
+
   .search-modal {
     margin: 1rem;
     max-height: 90vh;
@@ -1565,6 +1816,44 @@ onUnmounted(() => {
     flex-direction: column;
     gap: 0.25rem;
   }
+
+  .delete-modal {
+    margin: 1rem;
+  }
+
+  .delete-actions {
+    flex-direction: column;
+  }
+
+  .cancel-btn,
+  .confirm-delete-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .delete-note.warning {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 }
 
+@media (max-width: 480px) {
+  .file-browser {
+    padding: 0.5rem;
+  }
+
+  .modern-header {
+    padding: 0.75rem;
+  }
+
+  .breadcrumb-link {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.75rem;
+  }
+
+  .action-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+  }
+}
 </style>

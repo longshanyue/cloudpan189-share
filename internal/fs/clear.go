@@ -18,8 +18,9 @@ func (f *fs) ClearOsType(ctx context.Context, osTypes ...string) (int64, error) 
 	// 检查是否需要删除真实文件
 	needDeleteReal := false
 	for _, osType := range osTypes {
-		if osType == "real_file" { // 你的 OsTypeRealFile 常量值
+		if osType == "real_file" {
 			needDeleteReal = true
+
 			break
 		}
 	}

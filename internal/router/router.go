@@ -101,6 +101,7 @@ func StartHTTPServer() error {
 		storageRouter.POST("/delete", storageService.Delete())
 		storageRouter.POST("/modify_token", storageService.ModifyToken())
 		storageRouter.GET("/list", storageService.List())
+		storageRouter.POST("/clear_real_file", storageService.ClearRealFile())
 
 		openapiRouter.POST("/storage/deep_refresh_file", userService.AuthMiddleware(models.PermissionBase), storageService.DeepRefreshFile())
 		openapiRouter.GET("/storage/file/search", userService.AuthMiddleware(models.PermissionBase), storageService.Search())
@@ -108,6 +109,8 @@ func StartHTTPServer() error {
 
 	{
 		openapiRouter.GET("/open_file/*path", userService.AuthMiddleware(models.PermissionBase), universalFsService.BaseMiddleware(), universalFsService.Open("/", "json"))
+		openapiRouter.DELETE("/open_file/*path", userService.AuthMiddleware(models.PermissionBase), universalFsService.BaseMiddleware(), universalFsService.Delete())
+
 		davMethods := []string{"GET", "HEAD", "POST", "OPTIONS", "PROPFIND", "MKCOL", "MOVE", "LOCK", "UNLOCK"}
 
 		handler := []gin.HandlerFunc{
@@ -115,6 +118,7 @@ func StartHTTPServer() error {
 			universalFsService.DavMiddleware(),
 			universalFsService.BaseMiddleware(),
 		}
+
 		registry := []struct {
 			path     string
 			prefix   string

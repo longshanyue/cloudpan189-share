@@ -22,7 +22,7 @@ var scanJobInstance = &scanJob{
 var (
 	ErrScanJobFull   = errors.New("执行任务队列已满，请稍后再试")
 	ErrJobConflict   = errors.New("当前任务或与已存在任务冲突")
-	ErrJobNotFound   = fmt.Errorf("")
+	ErrJobNotFound   = errors.New("任务未找到")
 	ErrInvalidStatus = fmt.Errorf("invalid job status transition")
 )
 
