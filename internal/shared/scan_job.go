@@ -33,7 +33,8 @@ const (
 	ScanJobTypeRefresh     ScanJobType = "refresh"      // 添加时或普通刷新时调用
 	ScanJobTypeDeepRefresh ScanJobType = "deep_refresh" // 递归刷新时调用 rev 相同也继续扫描
 	ScanJobRebuildStrm     ScanJobType = "rebuild_strm"
-	ScanJobClearStream     ScanJobType = "clear_stream"
+	ScanJobClearStrm       ScanJobType = "clear_strm"
+	ScanJobClearRealFile   ScanJobType = "clear_real_file"
 )
 
 type ScanMsg struct {

@@ -81,7 +81,7 @@ func (s *service) Delete() gin.HandlerFunc {
 		if err = s.db.WithContext(ctx).Where("id = ?", fid).Delete(&models.VirtualFile{}).Error; err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{
 				"code":    http.StatusInternalServerError,
-				"message": "删除用户组失败",
+				"message": "删除文件失败",
 			})
 
 			return
@@ -89,7 +89,7 @@ func (s *service) Delete() gin.HandlerFunc {
 
 		ctx.JSON(http.StatusNoContent, gin.H{
 			"code":    http.StatusNoContent,
-			"message": "删除用户组成功",
+			"message": "删除成功",
 		})
 	}
 }

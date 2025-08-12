@@ -49,7 +49,7 @@ func (s *service) ToggleStrmFileEnable() gin.HandlerFunc {
 				return
 			}
 		} else {
-			if err := shared.ScanJobPublish(shared.ScanJobClearStream, new(models.VirtualFile)); err != nil {
+			if err := shared.ScanJobPublish(shared.ScanJobClearStrm, new(models.VirtualFile)); err != nil {
 				ctx.JSON(http.StatusInternalServerError, gin.H{
 					"code": http.StatusInternalServerError,
 					"msg":  fmt.Sprintf("下发清除任务失败：%s", err.Error()),
