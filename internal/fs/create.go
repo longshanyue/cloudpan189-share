@@ -49,16 +49,6 @@ func (f *fs) BatchCreate(ctx context.Context, pid int64, files ...File) (count i
 		return 0, RootDirProhibitsCreateFile
 	}
 
-	strmFiles := make([]File, 0)
-
-	for _, file := range files {
-		file.ParentId = pid
-
-		if strmFile, ok := GetStrm(file); ok {
-			strmFiles = append(strmFiles, strmFile)
-		}
-	}
-
 	if result := f.getDB(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "parent_id"}, {Name: "name"}},
 		DoNothing: true,
@@ -67,6 +57,16 @@ func (f *fs) BatchCreate(ctx context.Context, pid int64, files ...File) (count i
 
 		return 0, result.Error
 	} else {
+		strmFiles := make([]File, 0)
+
+		for _, file := range files {
+			file.ParentId = pid
+
+			if strmFile, ok := GetStrm(file); ok {
+				strmFiles = append(strmFiles, strmFile)
+			}
+		}
+
 		_, _ = f.BatchCreate(ctx, pid, strmFiles...)
 
 		return result.RowsAffected, nil
