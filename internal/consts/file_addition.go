@@ -21,4 +21,6 @@ const (
 	FileAdditionKeyShareType = "share_type"
 	// FileAdditionKeyIsFolder 是否为文件夹
 	FileAdditionKeyIsFolder = "is_folder"
+	// FileAdditionKeyDisableAutoScan 是否禁用自动扫描队列（仅is_top=1时生效）
+	FileAdditionKeyDisableAutoScan = "disable_auto_scan"
 )

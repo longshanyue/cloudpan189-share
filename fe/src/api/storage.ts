@@ -15,6 +15,7 @@ export interface Storage {
     subscribe_user?: string
     share_code?: string
     share_access_code?: string
+    disable_auto_scan?: boolean
   }
   jobStatus?: JobStat
 }
@@ -119,6 +120,16 @@ export interface ClearRealFileResponse {
   message: string
 }
 
+export interface ToggleAutoScanRequest {
+  id: number
+  disableAutoScan: boolean
+}
+
+export interface ToggleAutoScanResponse {
+  code: number
+  msg: string
+}
+
 // 存储API
 export const storageApi = {
   // 添加存储
@@ -154,5 +165,10 @@ export const storageApi = {
   // 清空本地真实存储
   clearRealFile: (): Promise<ClearRealFileResponse> => {
     return api.post('/storage/clear_real_file')
+  },
+
+  // 切换自动扫描设置
+  toggleAutoScan: (data: ToggleAutoScanRequest): Promise<ToggleAutoScanResponse> => {
+    return api.post('/storage/toggle_auto_scan', data)
   }
 }

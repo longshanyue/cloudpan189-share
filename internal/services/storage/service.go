@@ -17,6 +17,7 @@ type Service interface {
 	DeepRefreshFile() gin.HandlerFunc
 	Search() gin.HandlerFunc
 	ClearRealFile() gin.HandlerFunc
+	ToggleAutoScan() gin.HandlerFunc
 }
 
 type service struct {

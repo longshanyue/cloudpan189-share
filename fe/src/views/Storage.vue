@@ -45,7 +45,7 @@
               <th style="text-align: center">令牌绑定</th>
               <th style="text-align: center">创建时间</th>
               <th style="text-align: center">修改时间</th>
-              <th style="text-align: center">操作</th>
+              <th style="width: 350px; text-align: center">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -97,6 +97,17 @@
                 <div class="action-buttons">
                   <button @click="bindToken(storage)" class="btn btn-sm btn-secondary">
                     {{ storage.addition.cloud_token ? '重绑令牌' : '绑定令牌' }}
+                  </button>
+                  <button @click="toggleAutoScan(storage)" class="btn btn-sm" 
+                    :class="storage.addition.disable_auto_scan ? 'btn-success' : 'btn-info'"
+                    :disabled="toggleAutoScanLoading.has(storage.id)">
+                    <Icons :name="storage.addition.disable_auto_scan ? 'play' : 'pause'" size="0.875rem" class="btn-icon" />
+                    {{ toggleAutoScanLoading.has(storage.id) ? '处理中...' : 
+                       (storage.addition.disable_auto_scan ? '启用扫描' : '禁用扫描') }}
+                  </button>
+                  <button @click="refreshStorage(storage)" class="btn btn-sm btn-warning" :disabled="refreshingStorageIds.has(storage.id)">
+                    <Icons name="refresh" size="0.875rem" class="btn-icon" />
+                    {{ refreshingStorageIds.has(storage.id) ? '刷新中...' : '刷新索引' }}
                   </button>
                   <button @click="deleteStorage(storage)" class="btn btn-sm btn-danger">
                     删除
@@ -222,6 +233,8 @@ const bindLoading = ref(false)
 const availableTokens = ref<CloudToken[]>([])
 const bindingStorage = ref<Storage | null>(null)
 const selectedTokenId = ref('')
+const refreshingStorageIds = ref<Set<number>>(new Set())
+const toggleAutoScanLoading = ref<Set<number>>(new Set())
 
 // 新存储表单数据
 const newStorage = reactive({
@@ -408,6 +421,25 @@ const confirmBindToken = async () => {
   }
 }
 
+// 刷新存储索引
+const refreshStorage = async (storage: Storage) => {
+  try {
+    refreshingStorageIds.value.add(storage.id)
+    await storageApi.deepRefreshFile({ id: storage.id })
+    toast.success('刷新指令已发送，请查看任务状态')
+    fetchStorages()
+  } catch (error: any) {
+    if (error?.message) {
+      toast.error(error.message)
+    } else {
+      toast.error('刷新索引失败')
+    }
+    console.error('刷新索引失败:', error)
+  } finally {
+    refreshingStorageIds.value.delete(storage.id)
+  }
+}
+
 // 删除存储
 const deleteStorage = async (storage: Storage) => {
   const confirmed = await confirmDialog({
@@ -476,6 +508,43 @@ const getTokenExpireText = (token: CloudToken | undefined): string => {
     return `${diffHours}小时后到期`
   } else {
     return '即将到期'
+  }
+}
+
+// 切换自动扫描
+const toggleAutoScan = async (storage: Storage) => {
+  const currentStatus = storage.addition.disable_auto_scan
+  const action = currentStatus ? '启用' : '禁用'
+  
+  const confirmed = await confirmDialog({
+    title: `${action}自动扫描`,
+    message: `确定要${action}存储 "${storage.localPath}" 的自动扫描吗？`,
+    confirmText: action,
+    cancelText: '取消',
+    isDanger: !currentStatus
+  })
+
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    toggleAutoScanLoading.value.add(storage.id)
+    await storageApi.toggleAutoScan({
+      id: storage.id,
+      disableAutoScan: !currentStatus
+    })
+    toast.success(`${action}自动扫描成功`)
+    fetchStorages()
+  } catch (error: any) {
+    if (error?.message) {
+      toast.error(error.message)
+    } else {
+      toast.error(`${action}自动扫描失败`)
+    }
+    console.error(`${action}自动扫描失败:`, error)
+  } finally {
+    toggleAutoScanLoading.value.delete(storage.id)
   }
 }
 
@@ -592,6 +661,24 @@ onMounted(() => {
   background: #dc2626;
 }
 
+.btn-success {
+  background: #10b981;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: #059669;
+}
+
+.btn-info {
+  background: #0ea5e9;
+  color: white;
+}
+
+.btn-info:hover:not(:disabled) {
+  background: #0284c7;
+}
+
 .btn-sm {
   padding: 0.5rem 0.75rem;
   font-size: 0.75rem;
@@ -677,17 +764,26 @@ onMounted(() => {
 .storage-table th {
   background: #f9fafb;
   padding: 1rem;
-  text-align: left;
+  text-align: center;
   font-weight: 600;
   color: #374151;
   border-bottom: 1px solid #e5e7eb;
   font-size: 0.875rem;
 }
 
+.storage-table th:nth-child(2) {
+  text-align: left;
+}
+
 .storage-table td {
   padding: 1rem;
   border-bottom: 1px solid #f3f4f6;
   font-size: 0.875rem;
+  text-align: center;
+}
+
+.storage-table td:nth-child(2) {
+  text-align: left;
 }
 
 .storage-row:hover {
@@ -760,8 +856,9 @@ onMounted(() => {
 
 .action-buttons {
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  gap: 0.25rem;
+  flex-wrap: nowrap;
+  justify-content: center;
 }
 
 .action-buttons-group {
