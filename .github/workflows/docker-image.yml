@@ -73,11 +73,16 @@ jobs:
             VAR_BUILD_DATE=${{ env.VAR_BUILD_DATE }}
             VAR_GIT_SUMMARY=${{ env.VAR_GIT_SUMMARY }}
             VAR_GIT_BRANCH=${{ env.VAR_GIT_BRANCH }}
-            OUTPUT_DIR=/app
-            BINARY_NAME=share
-          tags: |
-            ${{ env.DOCKERHUB_REPO }}:latest
-            ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}
+          # 只有符合 vX.Y.Z 的稳定版才额外打 latest，预发布版（包含 '-'）只打自身版本
+          tags: ${{ fromJson(
+            concat(
+              '["', env.DOCKERHUB_REPO, ':', env.APP_VERSION, '"',
+              contains(env.APP_VERSION, '-') ?
+                '' :
+                concat(',"', env.DOCKERHUB_REPO, ':latest"'),
+              ']'
+            )
+          ) }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -91,7 +96,7 @@ jobs:
           echo "🎉 Docker 镜像构建完成！"
           echo ""
           echo "📦 镜像标签:"
-          echo "  - ${{ env.DOCKERHUB_REPO }}:latest"
+          echo "  - ${{ env.DOCKERHUB_REPO }}:${{ contains(env.APP_VERSION, '-') && env.APP_VERSION || 'latest' }}"
           echo "  - ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}"
           echo ""
           echo "🏗️ 支持的架构:"

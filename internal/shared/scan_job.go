@@ -22,7 +22,7 @@ var scanJobInstance = &scanJob{
 var (
 	ErrScanJobFull   = errors.New("执行任务队列已满，请稍后再试")
 	ErrJobConflict   = errors.New("当前任务或与已存在任务冲突")
-	ErrJobNotFound   = fmt.Errorf("")
+	ErrJobNotFound   = errors.New("任务未找到")
 	ErrInvalidStatus = fmt.Errorf("invalid job status transition")
 )
 
@@ -32,6 +32,9 @@ const (
 	ScanJobTypeDel         ScanJobType = "del"
 	ScanJobTypeRefresh     ScanJobType = "refresh"      // 添加时或普通刷新时调用
 	ScanJobTypeDeepRefresh ScanJobType = "deep_refresh" // 递归刷新时调用 rev 相同也继续扫描
+	ScanJobRebuildStrm     ScanJobType = "rebuild_strm"
+	ScanJobClearStrm       ScanJobType = "clear_strm"
+	ScanJobClearRealFile   ScanJobType = "clear_real_file"
 )
 
 type ScanMsg struct {

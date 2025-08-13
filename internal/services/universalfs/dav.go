@@ -1,7 +1,9 @@
 package universalfs
 
 import (
+	"errors"
 	"fmt"
+	"golang.org/x/net/webdav"
 	"net/http"
 	"net/url"
 	"path"
@@ -9,66 +11,19 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/xxcheng123/cloudpan189-share/internal/types"
+	"go.uber.org/zap"
 )
-
-func (s *service) DavMiddleware() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		if ctx.GetHeader("Depth") == "" {
-			ctx.Request.Header.Add("Depth", "1")
-		} else if ctx.GetHeader("Depth") == "infinity" {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": "`infinity` is not allowed",
-			})
-
-			ctx.Abort()
-
-			return
-		}
-
-		if ctx.GetHeader("X-Litmus") == "props: 3 (propfind_invalid2)" {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": "Invalid property name",
-			})
-
-			ctx.Abort()
-
-			return
-		}
-
-		switch ctx.Request.Method {
-		case "PROPFIND":
-			ctx.Next()
-		case "GET", "HEAD", "POST":
-			ctx.Next()
-		case "OPTIONS":
-			allow := "OPTIONS, HEAD, GET, POST, PROPFIND"
-			ctx.Header("Allow", allow)
-			// http://www.webdav.org/specs/rfc4918.html#dav.compliance.classes
-			ctx.Header("DAV", "1, 2")
-			// http://msdn.microsoft.com/en-au/library/cc250217.aspx
-			ctx.Header("MS-Author-Via", "DAV")
-
-			ctx.Abort()
-		default:
-			ctx.JSON(http.StatusMethodNotAllowed, gin.H{
-				"code":    http.StatusMethodNotAllowed,
-				"message": "Method not allowed",
-			})
-
-			ctx.Abort()
-		}
-	}
-}
 
 func (s *service) responseDav(ctx *gin.Context, fileInfo *FileInfo) {
 	switch ctx.Request.Method {
 	case "GET", "HEAD", "POST":
 		if fileInfo.IsFolder == 1 {
-			ctx.JSON(http.StatusMethodNotAllowed, gin.H{
-				"code":    http.StatusMethodNotAllowed,
-				"message": "Method not allowed",
+			s.logger.Warn("尝试对文件夹执行不支持的操作", zap.String("method", ctx.Request.Method), zap.String("path", ctx.Request.URL.Path))
+
+			ctx.JSON(http.StatusMethodNotAllowed, types.ErrResponse{
+				Code:    http.StatusMethodNotAllowed,
+				Message: "文件夹不支持此操作",
 			})
 
 			return
@@ -326,4 +281,59 @@ func escapeXML(s string) string {
 	s = strings.ReplaceAll(s, "\"", "&quot;")
 	s = strings.ReplaceAll(s, "'", "&#39;")
 	return s
+}
+
+const (
+	lockTimeout = 30 * time.Minute
+)
+
+func (s *service) lock(now time.Time, root string) (token string, status int, err error) {
+	token, err = s.LockSystem.Create(now, webdav.LockDetails{
+		Root:      root,
+		Duration:  lockTimeout,
+		ZeroDepth: true,
+	})
+	if err != nil {
+		if errors.Is(err, webdav.ErrLocked) {
+			s.logger.Warn("资源已被锁定", zap.String("root", root), zap.Error(err))
+			return "", webdav.StatusLocked, err
+		}
+		s.logger.Error("创建锁失败", zap.String("root", root), zap.Error(err))
+		return "", http.StatusInternalServerError, err
+	}
+	return token, 0, nil
+}
+
+func (s *service) confirmLocks(src, dst string) (release func(), status int, err error) {
+	now, srcToken, dstToken := time.Now(), "", ""
+	if src != "" {
+		srcToken, status, err = s.lock(now, src)
+		if err != nil {
+			s.logger.Error("锁定源路径失败", zap.String("src", src), zap.Error(err))
+			return nil, status, err
+		}
+	}
+	if dst != "" {
+		dstToken, status, err = s.lock(now, dst)
+		if err != nil {
+			if srcToken != "" {
+				_ = s.LockSystem.Unlock(now, srcToken)
+			}
+			s.logger.Error("锁定目标路径失败", zap.String("dst", dst), zap.Error(err))
+			return nil, status, err
+		}
+	}
+
+	return func() {
+		if dstToken != "" {
+			if err := s.LockSystem.Unlock(now, dstToken); err != nil {
+				s.logger.Warn("解锁目标路径失败", zap.String("dst", dst), zap.String("token", dstToken), zap.Error(err))
+			}
+		}
+		if srcToken != "" {
+			if err := s.LockSystem.Unlock(now, srcToken); err != nil {
+				s.logger.Warn("解锁源路径失败", zap.String("src", src), zap.String("token", srcToken), zap.Error(err))
+			}
+		}
+	}, 0, nil
 }

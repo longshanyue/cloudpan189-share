@@ -115,6 +115,10 @@ export interface SearchResponse {
   data: SearchItem[]
 }
 
+export interface ClearRealFileResponse {
+  message: string
+}
+
 // 存储API
 export const storageApi = {
   // 添加存储
@@ -145,5 +149,10 @@ export const storageApi = {
   // 搜索文件
   search: (params: SearchRequest): Promise<SearchResponse> => {
     return api.get('/storage/file/search', { params })
+  },
+
+  // 清空本地真实存储
+  clearRealFile: (): Promise<ClearRealFileResponse> => {
+    return api.post('/storage/clear_real_file')
   }
 }

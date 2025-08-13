@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"github.com/xxcheng123/cloudpan189-interface/client"
+	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
 	"github.com/xxcheng123/cloudpan189-share/internal/shared"
@@ -114,7 +115,7 @@ func (s *service) Add() gin.HandlerFunc {
 		}
 
 		if req.CloudToken != 0 {
-			m.Addition["cloud_token"] = req.CloudToken
+			m.Addition[consts.FileAdditionKeyCloudToken] = req.CloudToken
 		}
 
 		if req.Protocol == "subscribe" {
@@ -128,7 +129,7 @@ func (s *service) Add() gin.HandlerFunc {
 				return
 			}
 
-			m.Addition["subscribe_user"] = req.SubscribeUser
+			m.Addition[consts.FileAdditionKeySubscribeUser] = req.SubscribeUser
 		} else if req.Protocol == "share" {
 			var opts []client.GetShareInfoOption
 
@@ -169,13 +170,13 @@ func (s *service) Add() gin.HandlerFunc {
 				return
 			}
 
-			m.Addition["share_id"] = resp.ShareId
-			m.Addition["share_code"] = req.ShareCode
-			m.Addition["access_code"] = req.ShareAccessCode
-			m.Addition["share_mode"] = resp.ShareMode
-			m.Addition["share_type"] = resp.ShareType
-			m.Addition["file_id"] = resp.FileId
-			m.Addition["is_folder"] = resp.IsFolder
+			m.Addition[consts.FileAdditionKeyShareId] = resp.ShareId
+			m.Addition[consts.FileAdditionKeyShareCode] = req.ShareCode
+			m.Addition[consts.FileAdditionKeyAccessCode] = req.ShareAccessCode
+			m.Addition[consts.FileAdditionKeyShareMode] = resp.ShareMode
+			m.Addition[consts.FileAdditionKeyShareType] = resp.ShareType
+			m.Addition[consts.FileAdditionKeyFileId] = resp.FileId
+			m.Addition[consts.FileAdditionKeyIsFolder] = resp.IsFolder
 		}
 
 		pid, err := s.findOrCreateAncestors(ctx, req.LocalPath)

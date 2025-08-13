@@ -11,9 +11,12 @@ import (
 
 type getResponse struct {
 	*models.Setting
-	RunTimes                  int64 `json:"runTimes"` // 已经运行的时间
-	MultipleStreamThreadCount int   `json:"multipleStreamThreadCount"`
-	MultipleStreamChunkSize   int64 `json:"multipleStreamChunkSize"`
+	RunTimes                  int64    `json:"runTimes"` // 已经运行的时间
+	MultipleStreamThreadCount int      `json:"multipleStreamThreadCount"`
+	MultipleStreamChunkSize   int64    `json:"multipleStreamChunkSize"`
+	StrmFileEnable            bool     `json:"strmFileEnable"`
+	StrmSupportFileExtList    []string `json:"strmSupportFileExtList"`
+	FileWritable              bool     `json:"fileWritable"`
 }
 
 func (s *service) Get() gin.HandlerFunc {
@@ -23,6 +26,9 @@ func (s *service) Get() gin.HandlerFunc {
 			RunTimes:                  time.Now().Unix() - s.starTime.Unix(),
 			MultipleStreamThreadCount: shared.MultipleStreamThreadCount,
 			MultipleStreamChunkSize:   shared.MultipleStreamChunkSize,
+			StrmFileEnable:            shared.StrmFileEnable,
+			StrmSupportFileExtList:    shared.StrmSupportFileExtList,
+			FileWritable:              shared.FileWritable,
 		})
 	}
 }

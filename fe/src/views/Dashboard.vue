@@ -70,43 +70,55 @@
         
         <SectionDivider />
         
-        <SubsectionTitle title="快速功能" />
+        <SubsectionTitle title="快速使用" />
         <div class="feature-section">
-          <div class="feature-grid">
-            <div class="feature-item">
-              <div class="feature-icon">
-                <Icons name="dashboard" size="1.2rem" />
+          <div class="dav-grid">
+            <div class="dav-item">
+              <div class="dav-header">
+                <div class="dav-icon">
+                  <Icons name="folder" size="1.2rem" />
+                </div>
+                <div class="dav-info">
+                  <h4 class="dav-title">普通 DAV</h4>
+                  <p class="dav-desc">访问时忽略自动生成的 STRM 文件</p>
+                  <p class="dav-hint">适用于需要查看原始文件的场景</p>
+                </div>
               </div>
-              <div class="feature-content">
-                <h4 class="feature-title">数据管理</h4>
-                <p class="feature-desc">管理云盘分享链接和文件</p>
-              </div>
-            </div>
-            <div class="feature-item">
-              <div class="feature-icon">
-                <Icons name="storage" size="1.2rem" />
-              </div>
-              <div class="feature-content">
-                <h4 class="feature-title">存储配置</h4>
-                <p class="feature-desc">配置存储策略和容量</p>
-              </div>
-            </div>
-            <div class="feature-item">
-              <div class="feature-icon">
-                <Icons name="users" size="1.2rem" />
-              </div>
-              <div class="feature-content">
-                <h4 class="feature-title">用户管理</h4>
-                <p class="feature-desc">管理系统用户和权限</p>
+              <div class="dav-url">
+                <input 
+                  type="text" 
+                  :value="getDavUrl('/dav')" 
+                  readonly 
+                  class="url-input"
+                  @click="selectText"
+                />
+                <button @click="copyToClipboard(getDavUrl('/dav'))" class="copy-btn">
+                  <Icons name="copy" size="0.9rem" />
+                </button>
               </div>
             </div>
-            <div class="feature-item">
-              <div class="feature-icon">
-                <Icons name="settings" size="1.2rem" />
+            <div class="dav-item">
+              <div class="dav-header">
+                <div class="dav-icon strm-icon">
+                  <Icons name="file" size="1.2rem" />
+                </div>
+                <div class="dav-info">
+                  <h4 class="dav-title">STRM DAV</h4>
+                  <p class="dav-desc">优先显示 STRM 文件，否则显示原文件</p>
+                  <p class="dav-hint">如果没有生成 STRM 文件，可在系统设置中开启或重建</p>
+                </div>
               </div>
-              <div class="feature-content">
-                <h4 class="feature-title">系统设置</h4>
-                <p class="feature-desc">配置系统参数和安全</p>
+              <div class="dav-url">
+                <input 
+                  type="text" 
+                  :value="getDavUrl('/strm_dav')" 
+                  readonly 
+                  class="url-input"
+                  @click="selectText"
+                />
+                <button @click="copyToClipboard(getDavUrl('/strm_dav'))" class="copy-btn">
+                  <Icons name="copy" size="0.9rem" />
+                </button>
               </div>
             </div>
           </div>
@@ -125,6 +137,7 @@ import PageCard from '@/components/PageCard.vue'
 import SectionDivider from '@/components/SectionDivider.vue'
 import SubsectionTitle from '@/components/SubsectionTitle.vue'
 import { getPermissionDetails } from '@/utils/permissions'
+import { toast } from '@/utils/toast'
 
 const authStore = useAuthStore()
 const settingStore = useSettingStore()
@@ -174,6 +187,41 @@ const getGreeting = (): string => {
     return '下午好'
   } else {
     return '晚上好'
+  }
+}
+
+// 获取DAV URL
+const getDavUrl = (path: string): string => {
+  const baseURL = settingStore.setting?.baseURL || window.location.origin
+  return baseURL.endsWith('/') ? baseURL + path.substring(1) : baseURL + path
+}
+
+// 选中文本
+const selectText = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  input.select()
+}
+
+// 复制到剪贴板
+const copyToClipboard = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    toast.success('DAV 地址已复制到剪贴板')
+  } catch (error) {
+    console.error('复制失败:', error)
+    // 降级方案：使用传统方法
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    document.body.appendChild(textArea)
+    textArea.select()
+    try {
+      document.execCommand('copy')
+      toast.success('DAV 地址已复制到剪贴板')
+    } catch (fallbackError) {
+      console.error('降级复制也失败:', fallbackError)
+      toast.error('复制失败，请手动复制')
+    }
+    document.body.removeChild(textArea)
   }
 }
 
@@ -348,6 +396,139 @@ onUnmounted(() => {
   margin-top: 0.5rem;
 }
 
+/* DAV 网格布局 */
+.dav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1rem;
+}
+
+/* DAV 项目样式 */
+.dav-item {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dav-item:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  transform: translateY(-1px);
+}
+
+/* DAV 头部 */
+.dav-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.dav-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border: 1px solid #3b82f6;
+  border-radius: 8px;
+  color: #1d4ed8;
+  flex-shrink: 0;
+}
+
+.dav-icon.strm-icon {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  border-color: #10b981;
+  color: #047857;
+}
+
+.dav-info {
+  flex: 1;
+}
+
+.dav-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
+}
+
+.dav-desc {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.dav-hint {
+  font-size: 0.75rem;
+  color: #f59e0b;
+  margin: 0.375rem 0 0 0;
+  line-height: 1.4;
+  font-style: italic;
+}
+
+/* DAV URL 输入框和复制按钮 */
+.dav-url {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.url-input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #f9fafb;
+  font-size: 0.875rem;
+  color: #374151;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.url-input:hover {
+  border-color: #3b82f6;
+  background: #f0f9ff;
+}
+
+.url-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  background: white;
+}
+
+.copy-btn {
+  padding: 0.75rem;
+  background: #3b82f6;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  height: 2.5rem;
+}
+
+.copy-btn:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+.copy-btn:active {
+  transform: translateY(0);
+}
+
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -489,6 +670,34 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
     padding: 0 1rem 1rem 1rem;
   }
+  
+  /* DAV 响应式 */
+  .dav-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .dav-item {
+    padding: 1rem;
+  }
+  
+  .dav-header {
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .dav-icon {
+    width: 2rem;
+    height: 2rem;
+  }
+  
+  .dav-title {
+    font-size: 0.9rem;
+  }
+  
+  .dav-desc {
+    font-size: 0.8rem;
+  }
 }
 
 @media (max-width: 480px) {
@@ -510,6 +719,52 @@ onUnmounted(() => {
   
   .user-status {
     justify-content: center;
+  }
+  
+  /* DAV 小屏幕响应式 */
+  .dav-item {
+    padding: 0.75rem;
+  }
+  
+  .dav-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .dav-icon {
+    align-self: center;
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+  
+  .dav-info {
+    text-align: center;
+  }
+  
+  .dav-title {
+    font-size: 0.85rem;
+  }
+  
+  .dav-desc {
+    font-size: 0.75rem;
+  }
+  
+  .dav-url {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .url-input {
+    font-size: 0.8rem;
+    padding: 0.6rem 0.8rem;
+  }
+  
+  .copy-btn {
+    width: 100%;
+    min-width: auto;
+    height: 2.25rem;
   }
 }
 </style>

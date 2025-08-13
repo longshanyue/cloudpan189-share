@@ -3,6 +3,9 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/samber/lo"
 	"github.com/tickstep/cloudpan189-api/cloudpan"
@@ -10,8 +13,6 @@ import (
 	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"sync"
-	"time"
 )
 
 type AutoLoginJob struct {
@@ -25,7 +26,7 @@ type AutoLoginJob struct {
 func NewAutoLoginJob(db *gorm.DB, logger *zap.Logger) Job {
 	return &AutoLoginJob{
 		db:     db,
-		logger: logger.With(zap.String("job", "scan_file")),
+		logger: logger.With(zap.String("job", "auto_login")),
 	}
 }
 
@@ -50,7 +51,7 @@ func (s *AutoLoginJob) Start(ctx context.Context) error {
 
 			// 查询过期时间还剩7天的 token
 			var tokens = make([]*models.CloudToken, 0)
-			if err := s.db.WithContext(ctx).Where("login_type = ?", models.LoginTypePassword).Where("expires_in < ?", time.Now().Unix()-7*24*3600).Find(&tokens).Error; err != nil {
+			if err := s.db.WithContext(ctx).Where("login_type = ?", models.LoginTypePassword).Where("expires_in < ?", time.Now().Unix()+7*24*3600).Find(&tokens).Error; err != nil {
 				s.logger.Error("query cloud token error", zap.Error(err))
 
 				continue
@@ -59,9 +60,9 @@ func (s *AutoLoginJob) Start(ctx context.Context) error {
 			retryTimesMap := make(map[int64]int)
 
 			tokens = lo.Filter(tokens, func(token *models.CloudToken, index int) bool {
-				val, err := utils.Int(token.Addition)
+				val, err := utils.Int(token.Addition[models.CloudTokenAdditionAutoLoginTimes])
 				if err != nil {
-					return false
+					val = 0 // 如果获取失败，默认为0次重试
 				}
 
 				retryTimesMap[token.ID] = val

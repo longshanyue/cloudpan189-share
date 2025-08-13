@@ -1,3 +1,4 @@
 port: 12395
 dbFile: "data/share.db"
-logPath: "logs"
+logFile: "logs/share.log"
+fileDir: "datadir"

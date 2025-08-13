@@ -258,16 +258,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { fileApi, type FileItem } from '@/api/file'
+import {computed, onMounted, ref} from 'vue'
+import {useRoute, useRouter} from 'vue-router'
+import {fileApi, type FileItem} from '@/api/file'
 import Icons from '@/components/Icons.vue'
 import MediaPlayer from '@/components/MediaPlayer.vue'
-import { toast } from '@/utils/toast'
+import {toast} from '@/utils/toast'
 import vlcIcon from '@/assets/images/icons/vlc.webp'
 import potplayerIcon from '@/assets/images/icons/potplayer.webp'
 import mpcIcon from '@/assets/images/icons/mpc-hc.png'
 import QRCode from 'qrcode'
+
 const route = useRoute()
 const router = useRouter()
 
@@ -345,12 +346,6 @@ const isImageFile = (filename: string): boolean => {
   if (!filename || typeof filename !== 'string') return false
   const ext = filename.split('.').pop()?.toLowerCase()
   return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext || '')
-}
-
-const isAudioFile = (filename: string): boolean => {
-  if (!filename || typeof filename !== 'string') return false
-  const ext = filename.split('.').pop()?.toLowerCase()
-  return ['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a'].includes(ext || '')
 }
 
 // 获取文件图标
@@ -482,10 +477,6 @@ const onImageLoaded = () => {
   console.log('图片加载完成')
 }
 
-const onAudioLoaded = () => {
-  console.log('音频加载完成')
-}
-
 // 媒体加载错误
 const onMediaError = (error: Error) => {
   console.error('媒体加载失败:', error)
@@ -500,6 +491,7 @@ const copyFileLink = async () => {
     // 检查是否支持现代剪贴板API
     if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(fileInfo.value.downloadURL)
+      toast.success('链接已复制到剪贴板')
     } else {
       // 使用传统方法
       const textArea = document.createElement('textarea')
@@ -510,10 +502,17 @@ const copyFileLink = async () => {
       document.body.appendChild(textArea)
       textArea.focus()
       textArea.select()
-      document.execCommand('copy')
+      
+      try {
+        document.execCommand('copy')
+        toast.success('链接已复制到剪贴板')
+      } catch (fallbackError) {
+        console.error('降级复制也失败:', fallbackError)
+        toast.error('复制失败，请手动复制')
+      }
+      
       document.body.removeChild(textArea)
     }
-    toast.success('链接已复制到剪贴板')
   } catch (error) {
     console.error('复制链接失败:', error)
     toast.error('复制链接失败')
@@ -562,9 +561,8 @@ const loadFileInfo = async () => {
   try {
     loading.value = true
     error.value = null
-    
-    const result = await fileApi.getFile(currentPath.value)
-    fileInfo.value = result
+
+    fileInfo.value = await fileApi.getFile(currentPath.value)
   } catch (err: any) {
     console.error('加载文件失败:', err)
     error.value = {

@@ -18,6 +18,9 @@ export interface Setting {
   autoRefreshMinutes: number // 自动刷新间隔（分钟）
   multipleStreamThreadCount: number // 多线程流线程数
   multipleStreamChunkSize: number // 多线程流块大小
+  strmFileEnable: boolean // STRM文件启用状态
+  strmSupportFileExtList: string[] // STRM支持的文件扩展名列表
+  fileWritable: boolean // 文件可写状态
 }
 
 export interface InitSystemRequest {
@@ -60,17 +63,32 @@ export interface ModifyAutoRefreshMinutesRequest {
   autoRefreshMinutes: number
 }
 
-// 新增：修改多线程流线程数请求
+// 修改多线程流线程数请求
 export interface ModifyMultipleStreamThreadCountRequest {
   multipleStreamThreadCount: number // 1-64之间
 }
 
-// 新增：修改多线程流块大小请求
+// 修改多线程流块大小请求
 export interface ModifyMultipleStreamChunkSizeRequest {
   multipleStreamChunkSize: number // 512KB-32MB之间
 }
 
-// 新增：修改操作的通用响应
+// 切换STRM文件启用状态请求
+export interface ToggleStrmFileEnableRequest {
+  strmFileEnable: boolean
+}
+
+// 修改STRM支持文件扩展名列表请求
+export interface ModifyStrmSupportFileExtListRequest {
+  strmSupportFileExtList: string[] // 可选，不传或空数组表示清空列表
+}
+
+// 新增：切换文件可写状态请求
+export interface ToggleFileWritableRequest {
+  fileWritable: boolean
+}
+
+// 修改操作的通用响应
 export interface ModifyResponse {
   rowsAffected: number
 }
@@ -127,14 +145,29 @@ export const settingApi = {
     return api.post('/setting/modify_auto_refresh_minutes', data)
   },
 
-  // 新增：修改多线程流线程数
+  // 修改多线程流线程数
   modifyMultipleStreamThreadCount: (data: ModifyMultipleStreamThreadCountRequest): Promise<ModifyResponse> => {
     return api.post('/setting/modify_multiple_stream_thread_count', data)
   },
 
-  // 新增：修改多线程流块大小
+  // 修改多线程流块大小
   modifyMultipleStreamChunkSize: (data: ModifyMultipleStreamChunkSizeRequest): Promise<ModifyResponse> => {
     return api.post('/setting/modify_multiple_stream_chunk_size', data)
+  },
+
+  // 切换STRM文件启用状态
+  toggleStrmFileEnable: (data: ToggleStrmFileEnableRequest): Promise<ModifyResponse> => {
+    return api.post('/setting/toggle_strm_file_enable', data)
+  },
+
+  // 修改STRM支持文件扩展名列表
+  modifyStrmSupportFileExtList: (data: ModifyStrmSupportFileExtListRequest): Promise<ModifyResponse> => {
+    return api.post('/setting/modify_strm_support_file_ext_list', data)
+  },
+
+  // 新增：切换文件可写状态
+  toggleFileWritable: (data: ToggleFileWritableRequest): Promise<ModifyResponse> => {
+    return api.post('/setting/toggle_file_writable', data)
   },
 
   // 初始化系统

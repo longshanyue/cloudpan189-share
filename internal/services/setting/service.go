@@ -25,6 +25,9 @@ type Service interface {
 	ModifyAutoRefreshMinutes() gin.HandlerFunc
 	ModifyMultipleStreamThreadCount() gin.HandlerFunc
 	ModifyMultipleStreamChunkSize() gin.HandlerFunc
+	ToggleStrmFileEnable() gin.HandlerFunc
+	ModifyStrmSupportFileExtList() gin.HandlerFunc
+	ToggleFileWritable() gin.HandlerFunc
 }
 
 type service struct {

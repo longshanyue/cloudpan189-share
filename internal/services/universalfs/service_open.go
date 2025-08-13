@@ -1,11 +1,7 @@
 package universalfs
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/samber/lo"
-	"go.uber.org/zap"
 	"net/http"
 	"net/url"
 	"path"
@@ -16,108 +12,70 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/samber/lo"
+	"go.uber.org/zap"
+
+	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
 	"github.com/xxcheng123/cloudpan189-share/internal/shared"
-	"gorm.io/gorm"
+	"github.com/xxcheng123/cloudpan189-share/internal/types"
 )
+
+type openRequest struct {
+	IncludeAutoGenerateStrmFile bool `form:"includeAutoGenerateStrmFile"`
+}
 
 func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		rawPath := ctx.Param("path")
+		var req = new(openRequest)
+		if err := ctx.ShouldBindQuery(req); err != nil {
+			s.logger.Warn("文件浏览请求参数错误", zap.Error(err))
 
-		paths, err := utils.SplitPath(rawPath)
-		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": err.Error(),
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: err.Error(),
 			})
 
 			return
 		}
 
-		var pid int64
-		var fullPaths = make([]string, 0)
-		var session = new(ReadSession)
-		var file = new(models.VirtualFile)
-
 		var (
-			groupId      = ctx.GetInt64("group_id")
-			groupFileSet = mapset.NewSet[int64]()
+			fid = ctx.GetInt64(consts.CtxKeyFileId)
+			pid = ctx.GetInt64(consts.CtxKeyParentId)
+			gid = ctx.GetInt64(consts.CtxKeyGroupId)
 		)
 
-		if groupId != 0 {
-			groupFiles := make([]*models.Group2File, 0)
+		file, err := s.getFileInfo(ctx, fid, pid)
+		if err != nil {
+			s.logger.Error("获取文件信息失败",
+				zap.Int64("fileId", fid),
+				zap.Int64("parentId", pid),
+				zap.Error(err))
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: err.Error(),
+			})
 
-			if err = s.db.WithContext(ctx).Model(new(models.Group2File)).Where("group_id", groupId).Find(&groupFiles).Error; err != nil {
-				s.logger.Error("get group files failure", zap.Error(err))
-
-				ctx.JSON(http.StatusInternalServerError, gin.H{
-					"code":    http.StatusInternalServerError,
-					"message": "获取用户组文件关系失败",
-				})
-
-				return
-			}
-
-			for _, groupFile := range groupFiles {
-				groupFileSet.Add(groupFile.FileId)
-			}
+			return
 		}
 
-		if len(paths) == 0 {
-			file = &models.VirtualFile{
-				ID:         0,
-				ParentId:   -1,
-				Name:       "root",
-				OsType:     models.OsTypeFolder,
-				CreateDate: s.startTime.Format(time.DateTime),
-				ModifyDate: s.startTime.Format(time.DateTime),
-				CreatedAt:  s.startTime,
-				UpdatedAt:  s.startTime,
-				Rev:        s.startTime.Format("20060102150405"),
-				IsFolder:   1,
-				Addition:   map[string]interface{}{},
-			}
-		} else {
-			for _, p := range paths {
-				var tmpFile = new(models.VirtualFile)
-				if err = s.db.WithContext(ctx).Where("parent_id", pid).Where("name", p).First(tmpFile).Error; err != nil {
-					if errors.Is(err, gorm.ErrRecordNotFound) {
-						ctx.JSON(http.StatusNotFound, gin.H{
-							"code":    http.StatusNotFound,
-							"message": "file not found",
-						})
+		var (
+			vPath, _         = ctx.Get(consts.CtxKeyFullPaths)
+			fullPaths        = utils.StringSlice(vPath)
+			vGroupFileSet, _ = ctx.Get(consts.CtxKeyGroupFileSet)
+		)
 
-						return
-					}
-
-					ctx.JSON(http.StatusBadRequest, gin.H{
-						"code":    http.StatusBadRequest,
-						"message": err.Error(),
-					})
-
-					return
-				} else {
-					if v, ok := tmpFile.Addition["cloud_token"]; ok {
-						session.CloudTokenID, _ = v.(json.Number).Int64()
-					}
-				}
-
-				if tmpFile.IsTop == 1 && groupId != 0 && !groupFileSet.Contains(tmpFile.ID) {
-					// 没有权限
-					ctx.JSON(http.StatusForbidden, gin.H{
-						"code":    http.StatusForbidden,
-						"message": "no permission",
-					})
-
-					return
-				}
-
-				fullPaths = append(fullPaths, p)
-				pid = tmpFile.ID
-				file = tmpFile
-			}
+		groupFileSet, ok := vGroupFileSet.(mapset.Set[int64])
+		if !ok {
+			s.logger.Error("获取用户组文件集合失败",
+				zap.Int64("fileId", fid),
+				zap.Int64("parentId", pid))
+			ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+				Code:    http.StatusInternalServerError,
+				Message: "获取用户组文件集合失败",
+			})
+			return
 		}
 
 		f := &FileInfo{
@@ -127,64 +85,152 @@ func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 		}
 
 		if file.IsFolder == 1 {
-			var list = make([]*models.VirtualFile, 0)
-			if err = s.db.WithContext(ctx).Where("parent_id", file.ID).Find(&list).Error; err != nil {
-				ctx.JSON(http.StatusBadRequest, gin.H{
-					"code":    http.StatusBadRequest,
-					"message": err.Error(),
+			if err := s.loadFolderChildren(ctx, f, gid, groupFileSet, format, req); err != nil {
+				s.logger.Error("加载文件夹子项失败",
+					zap.Int64("fileId", file.ID),
+					zap.String("fileName", file.Name),
+					zap.Error(err))
+				ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+					Code:    http.StatusBadRequest,
+					Message: err.Error(),
 				})
 
 				return
 			}
-
-			for _, v := range list {
-				f.Children = append(f.Children, &FileInfo{
-					VirtualFile: v,
-					Path:        path.Join(f.Path, v.Name),
-					Href:        utils.PathEscape(f.Path, v.Name),
-				})
-			}
-
-			if groupId != 0 {
-				f.Children = lo.Filter(f.Children, func(item *FileInfo, _ int) bool {
-					if item.IsTop == 1 && !groupFileSet.Contains(item.ID) {
-						return false
-					}
-
-					return true
-				})
-			}
-
-			sort.Slice(f.Children, func(i, j int) bool {
-				if f.Children[i].IsFolder != f.Children[j].IsFolder {
-					return f.Children[i].IsFolder > f.Children[j].IsFolder
-				}
-
-				return f.Children[i].Rev > f.Children[j].Rev
-			})
 		} else {
-			values := enc(url.Values{
-				"id":     []string{fmt.Sprintf("%d", file.ID)},
-				"random": []string{uuid.NewString()},
-			}, shared.Setting.SaltKey)
+			f.DownloadURL = s.generateDownloadURL(file.ID)
+		}
 
-			baseURL := shared.Setting.BaseURL
-			if baseURL == "" {
-				scheme := "http"
-				if ctx.Request.TLS != nil {
-					scheme = "https"
-				}
-				baseURL = fmt.Sprintf("%s://%s", scheme, ctx.Request.Host)
+		s.responseByFormat(ctx, f, format)
+	}
+}
+
+func (s *service) getFileInfo(ctx *gin.Context, fid, pid int64) (*models.VirtualFile, error) {
+	if pid == -1 && fid == 0 {
+		// 根目录特殊处理
+		return &models.VirtualFile{
+			ID:         0,
+			ParentId:   -1,
+			Name:       "root",
+			OsType:     models.OsTypeFolder,
+			CreateDate: s.startTime.Format(time.DateTime),
+			ModifyDate: s.startTime.Format(time.DateTime),
+			CreatedAt:  s.startTime,
+			UpdatedAt:  s.startTime,
+			Rev:        s.startTime.Format("20060102150405"),
+			IsFolder:   1,
+			Addition:   map[string]interface{}{},
+		}, nil
+	}
+
+	file := new(models.VirtualFile)
+	if err := s.db.WithContext(ctx).Where("id", fid).First(&file).Error; err != nil {
+		return nil, err
+	}
+
+	return file, nil
+}
+
+func (s *service) loadFolderChildren(ctx *gin.Context, f *FileInfo, gid int64, groupFileSet mapset.Set[int64], format string, req *openRequest) error {
+	var list = make([]*models.VirtualFile, 0)
+	if err := s.db.WithContext(ctx).Where("parent_id", f.ID).Find(&list).Error; err != nil {
+		return err
+	}
+
+	// 构建子项列表
+	for _, v := range list {
+		f.Children = append(f.Children, &FileInfo{
+			VirtualFile: v,
+			Path:        path.Join(f.Path, v.Name),
+			Href:        utils.PathEscape(f.Path, v.Name),
+		})
+	}
+
+	// 应用权限过滤
+	if gid != 0 {
+		f.Children = lo.Filter(f.Children, func(item *FileInfo, _ int) bool {
+			if item.IsTop == 1 && !groupFileSet.Contains(item.ID) {
+				return false
 			}
 
-			f.DownloadURL = fmt.Sprintf("%s/api/file_download?%s", baseURL, values.Encode())
+			return true
+		})
+	}
+
+	// 根据格式过滤STRM文件
+	s.filterByFormat(f, format, req)
+
+	// 排序：文件夹优先，然后按修改时间倒序
+	sort.Slice(f.Children, func(i, j int) bool {
+		if f.Children[i].IsFolder != f.Children[j].IsFolder {
+			return f.Children[i].IsFolder > f.Children[j].IsFolder
 		}
 
-		switch format {
-		case "dav":
-			s.responseDav(ctx, f)
-		default:
-			ctx.JSON(http.StatusOK, f)
+		return f.Children[i].Rev > f.Children[j].Rev
+	})
+
+	return nil
+}
+
+func (s *service) filterByFormat(f *FileInfo, format string, req *openRequest) {
+	switch format {
+	case "dav":
+		// DAV格式：过滤掉STRM文件
+		f.Children = lo.Filter(f.Children, func(item *FileInfo, _ int) bool {
+			return item.OsType != models.OsTypeStrmFile
+		})
+	case "strm_dav":
+		// STRM DAV格式：过滤掉被STRM文件链接的原文件
+		var linkIds = make([]int64, 0)
+		for _, item := range f.Children {
+			if item.OsType == models.OsTypeStrmFile {
+				linkIds = append(linkIds, item.LinkId)
+			}
 		}
+
+		f.Children = lo.Filter(f.Children, func(item *FileInfo, _ int) bool {
+			return lo.IndexOf(linkIds, item.ID) == -1
+		})
+	case "json":
+		// JSON格式：根据参数决定是否包含自动生成的STRM文件
+		f.Children = lo.Filter(f.Children, func(item *FileInfo, _ int) bool {
+			if !req.IncludeAutoGenerateStrmFile && item.OsType == models.OsTypeStrmFile {
+				return false
+			}
+
+			return true
+		})
 	}
+}
+
+func (s *service) responseByFormat(ctx *gin.Context, f *FileInfo, format string) {
+	switch format {
+	case "dav", "strm_dav":
+		s.responseDav(ctx, f)
+	default:
+		ctx.JSON(http.StatusOK, f)
+	}
+}
+
+func (s *service) generateDownloadURL(fid int64) string {
+	values := enc(url.Values{
+		"id":     []string{fmt.Sprintf("%d", fid)},
+		"random": []string{uuid.NewString()},
+	}, shared.Setting.SaltKey)
+
+	baseURL := shared.Setting.BaseURL
+
+	return fmt.Sprintf("%s/api/file_download?%s", baseURL, values.Encode())
+}
+
+func (s *service) generateDownloadURLWithNeverExpire(fid int64) string {
+	values := enc(url.Values{
+		"id":        []string{fmt.Sprintf("%d", fid)},
+		"random":    []string{uuid.NewString()},
+		"timestamp": []string{"-1"},
+	}, shared.Setting.SaltKey)
+
+	baseURL := shared.Setting.BaseURL
+
+	return fmt.Sprintf("%s/api/file_download?%s", baseURL, values.Encode())
 }

@@ -2,10 +2,11 @@ package router
 
 import (
 	"fmt"
-	"github.com/xxcheng123/cloudpan189-share/internal/services/usergroup"
 	"io/fs"
 	"net/http"
 	"strings"
+
+	"github.com/xxcheng123/cloudpan189-share/internal/services/usergroup"
 
 	"github.com/gin-gonic/gin"
 	embed "github.com/xxcheng123/cloudpan189-share"
@@ -87,6 +88,9 @@ func StartHTTPServer() error {
 		settingRouter.POST("/modify_auto_refresh_minutes", settingService.ModifyAutoRefreshMinutes())
 		settingRouter.POST("/modify_multiple_stream_thread_count", settingService.ModifyMultipleStreamThreadCount())
 		settingRouter.POST("/modify_multiple_stream_chunk_size", settingService.ModifyMultipleStreamChunkSize())
+		settingRouter.POST("/toggle_strm_file_enable", settingService.ToggleStrmFileEnable())
+		settingRouter.POST("/modify_strm_support_file_ext_list", settingService.ModifyStrmSupportFileExtList())
+		settingRouter.POST("/toggle_file_writable", settingService.ToggleFileWritable())
 
 		openapiRouter.POST("/setting/init_system", settingService.InitSystem())
 	}
@@ -97,18 +101,69 @@ func StartHTTPServer() error {
 		storageRouter.POST("/delete", storageService.Delete())
 		storageRouter.POST("/modify_token", storageService.ModifyToken())
 		storageRouter.GET("/list", storageService.List())
+		storageRouter.POST("/clear_real_file", storageService.ClearRealFile())
 
 		openapiRouter.POST("/storage/deep_refresh_file", userService.AuthMiddleware(models.PermissionBase), storageService.DeepRefreshFile())
 		openapiRouter.GET("/storage/file/search", userService.AuthMiddleware(models.PermissionBase), storageService.Search())
 	}
 
 	{
-		openapiRouter.GET("/open_file/*path", userService.AuthMiddleware(models.PermissionBase), universalFsService.Open("/", "json"))
-		davMethods := []string{"GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PROPFIND", "MKCOL", "MOVE", "LOCK", "UNLOCK"}
-		for _, method := range davMethods {
-			engine.Handle(method, "/dav/*path", userService.BasicAuthMiddleware(models.PermissionDavRead), universalFsService.DavMiddleware(), universalFsService.Open("/dav", "dav"))
-			engine.Handle(method, "/dav", userService.BasicAuthMiddleware(models.PermissionDavRead), universalFsService.DavMiddleware(), universalFsService.Open("/dav", "dav"))
+		openapiRouter.GET("/open_file/*path", userService.AuthMiddleware(models.PermissionBase), universalFsService.BaseMiddleware(), universalFsService.Open("/", "json"))
+		openapiRouter.DELETE("/open_file/*path", userService.AuthMiddleware(models.PermissionBase), universalFsService.BaseMiddleware(), universalFsService.Delete())
+
+		davMethods := []string{"GET", "HEAD", "POST", "OPTIONS", "PROPFIND", "MKCOL", "MOVE", "LOCK", "UNLOCK"}
+
+		handler := []gin.HandlerFunc{
+			userService.BasicAuthMiddleware(models.PermissionBase),
+			universalFsService.DavMiddleware(),
+			universalFsService.BaseMiddleware(),
 		}
+
+		registry := []struct {
+			path     string
+			prefix   string
+			format   string
+			handlers []gin.HandlerFunc
+		}{
+			{
+				"/dav/*path",
+				"/dav",
+				"dav",
+				handler,
+			},
+			{
+				"/dav",
+				"/dav",
+				"dav",
+				handler,
+			},
+			{
+				"/strm_dav/*path",
+				"/strm_dav",
+				"strm_dav",
+				handler,
+			},
+			{
+				"/strm_dav",
+				"/strm_dav",
+				"strm_dav",
+				handler,
+			},
+		}
+
+		for _, method := range davMethods {
+			for _, r := range registry {
+				engine.Handle(method, r.path, append(r.handlers, universalFsService.Open(r.prefix, r.format))...)
+			}
+		}
+
+		for _, r := range registry {
+			engine.Handle(http.MethodPut, r.path, append(r.handlers, universalFsService.Put())...)
+		}
+		for _, r := range registry {
+			engine.Handle(http.MethodDelete, r.path, append(r.handlers, universalFsService.Delete())...)
+		}
+
 		openapiRouter.GET("/file_download", universalFsService.FileDownload())
 	}
 
