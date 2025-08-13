@@ -61,6 +61,20 @@ jobs:
           echo "  Git Summary: $(git describe --tags --dirty --always 2>/dev/null || git rev-parse --short HEAD)"
           echo "  Git Branch: $(git rev-parse --abbrev-ref HEAD)"
 
+      - name: 🏷️ Generate Docker tags
+        id: tags
+        run: |
+          # 生成 Docker 标签
+          TAGS="${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}"
+          
+          # 如果不是预发布版本（不包含 '-'），则添加 latest 标签
+          if [[ "${{ env.APP_VERSION }}" != *"-"* ]]; then
+            TAGS="${TAGS},${{ env.DOCKERHUB_REPO }}:latest"
+          fi
+          
+          echo "TAGS=${TAGS}" >> $GITHUB_ENV
+          echo "Generated tags: ${TAGS}"
+
       - name: 🔨 Build and push
         uses: docker/build-push-action@v5
         with:
@@ -73,16 +87,7 @@ jobs:
             VAR_BUILD_DATE=${{ env.VAR_BUILD_DATE }}
             VAR_GIT_SUMMARY=${{ env.VAR_GIT_SUMMARY }}
             VAR_GIT_BRANCH=${{ env.VAR_GIT_BRANCH }}
-          # 只有符合 vX.Y.Z 的稳定版才额外打 latest，预发布版（包含 '-'）只打自身版本
-          tags: ${{ fromJson(
-            concat(
-              '["', env.DOCKERHUB_REPO, ':', env.APP_VERSION, '"',
-              contains(env.APP_VERSION, '-') ?
-                '' :
-                concat(',"', env.DOCKERHUB_REPO, ':latest"'),
-              ']'
-            )
-          ) }}
+          tags: ${{ env.TAGS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -96,7 +101,9 @@ jobs:
           echo "🎉 Docker 镜像构建完成！"
           echo ""
           echo "📦 镜像标签:"
-          echo "  - ${{ env.DOCKERHUB_REPO }}:${{ contains(env.APP_VERSION, '-') && env.APP_VERSION || 'latest' }}"
+          if [[ "${{ env.APP_VERSION }}" != *"-"* ]]; then
+            echo "  - ${{ env.DOCKERHUB_REPO }}:latest"
+          fi
           echo "  - ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}"
           echo ""
           echo "🏗️ 支持的架构:"
