@@ -58,6 +58,29 @@ func Init() {
 		}
 	}
 
+	// 创建日志目录
+	logDir := filepath.Dir(c.LogFile)
+	if logDir != "" && logDir != "." {
+		if _, err = os.Stat(logDir); os.IsNotExist(err) {
+			if err = os.MkdirAll(logDir, 0755); err != nil {
+				panic(fmt.Sprintf("创建日志目录失败: %v", err))
+			}
+		} else if err != nil {
+			panic(fmt.Sprintf("检查日志目录失败: %v", err))
+		}
+	}
+
+	// 创建文件存储目录
+	if c.FileDir != "" {
+		if _, err = os.Stat(c.FileDir); os.IsNotExist(err) {
+			if err = os.MkdirAll(c.FileDir, 0755); err != nil {
+				panic(fmt.Sprintf("创建文件存储目录失败: %v", err))
+			}
+		} else if err != nil {
+			panic(fmt.Sprintf("检查文件存储目录失败: %v", err))
+		}
+	}
+
 	db, err = gorm.Open(sqlite.Open(c.DBFile), &gorm.Config{
 		NowFunc: func() time.Time {
 			// 使用中国时区，处理加载失败的情况
