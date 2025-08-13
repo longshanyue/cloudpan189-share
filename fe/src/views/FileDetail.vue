@@ -491,6 +491,7 @@ const copyFileLink = async () => {
     // 检查是否支持现代剪贴板API
     if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(fileInfo.value.downloadURL)
+      toast.success('链接已复制到剪贴板')
     } else {
       // 使用传统方法
       const textArea = document.createElement('textarea')
@@ -501,10 +502,17 @@ const copyFileLink = async () => {
       document.body.appendChild(textArea)
       textArea.focus()
       textArea.select()
-      document.execCommand('copy')
+      
+      try {
+        document.execCommand('copy')
+        toast.success('链接已复制到剪贴板')
+      } catch (fallbackError) {
+        console.error('降级复制也失败:', fallbackError)
+        toast.error('复制失败，请手动复制')
+      }
+      
       document.body.removeChild(textArea)
     }
-    toast.success('链接已复制到剪贴板')
   } catch (error) {
     console.error('复制链接失败:', error)
     toast.error('复制链接失败')

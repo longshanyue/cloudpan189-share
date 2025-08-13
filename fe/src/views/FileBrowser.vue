@@ -117,8 +117,9 @@
                 <span>刷新索引</span>
               </button>
 
-              <!-- 删除按钮 -->
+              <!-- 删除按钮 - 只有管理员才能看到 -->
               <button
+                  v-if="authStore.isAdmin"
                   @click.stop="confirmDelete(item)"
                   class="action-btn-small delete-btn"
                   :disabled="item.isTop === 1"
@@ -319,12 +320,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { fileApi, type FileItem } from '@/api/file'
 import {storageApi, type SearchRequest, type SearchItem as SearchFileItem} from '@/api/storage'
 import { useSettingStore } from '@/stores/setting'
+import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/utils/toast'
 import Icons from '@/components/Icons.vue'
 
 const route = useRoute()
 const router = useRouter()
 const settingStore = useSettingStore()
+const authStore = useAuthStore()
 
 // 响应式数据
 const loading = ref(false)
