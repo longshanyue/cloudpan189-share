@@ -42,6 +42,17 @@ export interface ModifyTokenRequest {
   cloudToken: number
 }
 
+export interface BatchBindTokenRequest {
+  ids: number[]
+  cloudToken: number
+}
+
+export interface BatchBindTokenResponse {
+  successCount: number
+  failedCount: number
+  failedFiles: number[]
+}
+
 export interface StorageListRequest {
   currentPage?: number
   pageSize?: number
@@ -149,6 +160,11 @@ export const storageApi = {
   // 修改令牌绑定
   modifyToken: (data: ModifyTokenRequest): Promise<void> => {
     return api.post('/storage/modify_token', data)
+  },
+
+  // 批量绑定令牌
+  batchBindToken: (data: BatchBindTokenRequest): Promise<BatchBindTokenResponse> => {
+    return api.post('/storage/batch_bind_token', data)
   },
 
   // 获取存储列表

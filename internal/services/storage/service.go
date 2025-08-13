@@ -14,6 +14,7 @@ type Service interface {
 	Delete() gin.HandlerFunc
 	List() gin.HandlerFunc
 	ModifyToken() gin.HandlerFunc
+	BatchBindToken() gin.HandlerFunc
 	DeepRefreshFile() gin.HandlerFunc
 	Search() gin.HandlerFunc
 	ClearRealFile() gin.HandlerFunc

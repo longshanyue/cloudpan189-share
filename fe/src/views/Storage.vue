@@ -29,6 +29,14 @@
           <input v-model="searchName" type="text" placeholder="搜索存储名称..." class="search-input" @input="handleSearch">
         </div>
         <div class="action-buttons-group">
+          <button 
+            v-if="selectedCount > 0" 
+            @click="openBatchBindModal" 
+            class="btn btn-warning"
+          >
+            <Icons name="link" size="1rem" class="btn-icon" />
+            批量绑定令牌 ({{ selectedCount }})
+          </button>
           <button @click="scanTopFiles" class="btn btn-info" :disabled="scanTopLoading">
             <Icons name="search" size="1rem" class="btn-icon" />
             {{ scanTopLoading ? '扫描中...' : '扫描所有文件' }}
@@ -60,6 +68,14 @@
         <table v-else class="storage-table">
           <thead>
             <tr>
+              <th style="width: 50px; text-align: center">
+                <input 
+                  type="checkbox" 
+                  :checked="isAllSelected" 
+                  @change="toggleSelectAll"
+                  class="checkbox"
+                />
+              </th>
               <th style="text-align: center">序号</th>
               <th style="text-align: center">挂载路径</th>
               <th style="text-align: center">协议类型</th>
@@ -72,6 +88,14 @@
           </thead>
           <tbody>
             <tr v-for="(storage, index) in storages" :key="storage.id" class="storage-row">
+              <td>
+                <input 
+                  type="checkbox" 
+                  :checked="selectedStorageIds.has(storage.id)"
+                  @change="toggleStorageSelection(storage.id)"
+                  class="checkbox"
+                />
+              </td>
               <td>{{ (currentPage - 1) * pageSize + index + 1 }}</td>
               <td>
                 <div class="storage-info">
@@ -223,6 +247,39 @@
         </div>
       </div>
     </div>
+
+    <!-- 批量绑定令牌弹窗 -->
+    <div v-if="showBatchBindModal" class="modal-overlay" @click="closeBatchBindModal">
+      <div class="modal-content small" @click.stop>
+        <div class="modal-header">
+          <h3>批量绑定令牌</h3>
+          <button @click="closeBatchBindModal" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="bind-info">
+            将为 <strong>{{ selectedCount }}</strong> 个存储批量绑定令牌
+          </p>
+          <div class="form-group">
+            <label class="form-label">选择令牌</label>
+            <Select v-model="batchSelectedTokenId" :options="tokenOptions" placeholder="请选择令牌" />
+          </div>
+          <div class="selected-storages">
+            <h4>已选择的存储：</h4>
+            <ul>
+              <li v-for="storage in storages.filter(s => selectedStorageIds.has(s.id))" :key="storage.id">
+                {{ storage.localPath }}
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="closeBatchBindModal" class="btn btn-secondary">取消</button>
+          <button @click="confirmBatchBindToken" class="btn btn-primary" :disabled="batchBindLoading">
+            {{ batchBindLoading ? '绑定中...' : '确认批量绑定' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </Layout>
 </template>
 
@@ -263,6 +320,12 @@ const refreshingStorageIds = ref<Set<number>>(new Set())
 const toggleAutoScanLoading = ref<Set<number>>(new Set())
 const scanTopLoading = ref(false)
 
+// 批量选择相关
+const selectedStorageIds = ref<Set<number>>(new Set())
+const showBatchBindModal = ref(false)
+const batchBindLoading = ref(false)
+const batchSelectedTokenId = ref('')
+
 // 新存储表单数据
 const newStorage = reactive({
   localPath: '',
@@ -285,6 +348,15 @@ const tokenOptions = computed(() => {
     label: token.name,
     value: token.id
   }))
+})
+
+// 批量选择相关计算属性
+const isAllSelected = computed(() => {
+  return storages.value.length > 0 && storages.value.every(storage => selectedStorageIds.value.has(storage.id))
+})
+
+const selectedCount = computed(() => {
+  return selectedStorageIds.value.size
 })
 
 // 获取存储列表
@@ -605,6 +677,75 @@ const scanTopFiles = async () => {
     console.error('扫描所有文件失败:', error)
   } finally {
     scanTopLoading.value = false
+  }
+}
+
+// 批量选择相关方法
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedStorageIds.value.clear()
+  } else {
+    storages.value.forEach(storage => {
+      selectedStorageIds.value.add(storage.id)
+    })
+  }
+}
+
+const toggleStorageSelection = (storageId: number) => {
+  if (selectedStorageIds.value.has(storageId)) {
+    selectedStorageIds.value.delete(storageId)
+  } else {
+    selectedStorageIds.value.add(storageId)
+  }
+}
+
+const openBatchBindModal = () => {
+  if (selectedStorageIds.value.size === 0) {
+    toast.warning('请先选择要批量绑定的存储')
+    return
+  }
+  showBatchBindModal.value = true
+}
+
+const closeBatchBindModal = () => {
+  showBatchBindModal.value = false
+  batchSelectedTokenId.value = ''
+}
+
+const confirmBatchBindToken = async () => {
+  if (!batchSelectedTokenId.value) {
+    toast.warning('请选择令牌')
+    return
+  }
+
+  if (selectedStorageIds.value.size === 0) {
+    toast.warning('请先选择要批量绑定的存储')
+    return
+  }
+
+  try {
+    batchBindLoading.value = true
+    const result = await storageApi.batchBindToken({
+      ids: Array.from(selectedStorageIds.value),
+      cloudToken: parseInt(batchSelectedTokenId.value)
+    })
+    
+    if (result.successCount > 0) {
+      toast.success(`成功绑定 ${result.successCount} 个存储`)
+    }
+    
+    if (result.failedCount > 0) {
+      toast.warning(`${result.failedCount} 个存储绑定失败`)
+    }
+    
+    closeBatchBindModal()
+    selectedStorageIds.value.clear()
+    fetchStorages()
+  } catch (error) {
+    console.error('批量绑定令牌失败:', error)
+    toast.error('批量绑定令牌失败')
+  } finally {
+    batchBindLoading.value = false
   }
 }
 
@@ -1297,6 +1438,49 @@ onMounted(() => {
   margin-bottom: 1rem;
   font-size: 0.875rem;
   color: #92400e;
+}
+
+/* 批量绑定弹窗样式 */
+.selected-storages {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.selected-storages h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.selected-storages ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.selected-storages li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.selected-storages li:last-child {
+  border-bottom: none;
+}
+
+/* 复选框样式 */
+.checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #3b82f6;
 }
 
 /* 响应式设计 */

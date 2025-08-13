@@ -100,6 +100,7 @@ func StartHTTPServer() error {
 		storageRouter.POST("/add", storageService.Add())
 		storageRouter.POST("/delete", storageService.Delete())
 		storageRouter.POST("/modify_token", storageService.ModifyToken())
+		storageRouter.POST("/batch_bind_token", storageService.BatchBindToken())
 		storageRouter.GET("/list", storageService.List())
 		storageRouter.POST("/clear_real_file", storageService.ClearRealFile())
 		storageRouter.POST("/toggle_auto_scan", storageService.ToggleAutoScan())
