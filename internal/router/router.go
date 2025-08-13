@@ -103,6 +103,7 @@ func StartHTTPServer() error {
 		storageRouter.GET("/list", storageService.List())
 		storageRouter.POST("/clear_real_file", storageService.ClearRealFile())
 		storageRouter.POST("/toggle_auto_scan", storageService.ToggleAutoScan())
+		storageRouter.POST("/scan_top", storageService.ScanTop())
 
 		openapiRouter.POST("/storage/deep_refresh_file", userService.AuthMiddleware(models.PermissionBase), storageService.DeepRefreshFile())
 		openapiRouter.GET("/storage/file/search", userService.AuthMiddleware(models.PermissionBase), storageService.Search())

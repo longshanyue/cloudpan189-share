@@ -18,6 +18,7 @@ type Service interface {
 	Search() gin.HandlerFunc
 	ClearRealFile() gin.HandlerFunc
 	ToggleAutoScan() gin.HandlerFunc
+	ScanTop() gin.HandlerFunc
 }
 
 type service struct {

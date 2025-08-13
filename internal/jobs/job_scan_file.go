@@ -127,14 +127,18 @@ func (s *ScanFileJob) doJob(ctx context.Context) bool {
 			} else {
 				s.logger.Info("删除真存储文件成功", zap.Int64("count", count))
 			}
+		case shared.ScanJobTypeScanTop:
+			if err := s.scanTop(ctx); err != nil {
+				s.logger.Error("扫描顶层文件任务执行失败", zap.Error(err))
+			}
 		}
 	case <-time.After(refreshMinutes * time.Minute):
 		if !shared.Setting.EnableTopFileAutoRefresh {
 			return true
 		}
 		s.logger.Info("scan top file job started")
-		if err := s.scanTop(s.ctx); err != nil {
-			s.logger.Error("scan file error", zap.Error(err))
+		if err := shared.ScanTopJobPublish(); err != nil {
+			s.logger.Error("failed to publish scan top job", zap.Error(err))
 		}
 	}
 

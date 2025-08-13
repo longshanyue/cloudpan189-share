@@ -2,6 +2,24 @@
   <Layout>
     <!-- 存储管理主卡片 -->
     <PageCard title="存储管理" subtitle="管理存储挂载点和令牌绑定">
+      <template #extra>
+        <div class="scan-info-panel">
+          <div class="scan-info-item">
+            <span class="info-label">自动扫描:</span>
+            <span class="info-value" :class="settingStore.setting?.enableTopFileAutoRefresh ? 'status-enabled' : 'status-disabled'">
+              {{ settingStore.setting?.enableTopFileAutoRefresh ? '已开启' : '已关闭' }}
+            </span>
+          </div>
+          <div class="scan-info-item">
+            <span class="info-label">扫描间隔:</span>
+            <span class="info-value">{{ settingStore.setting?.autoRefreshMinutes || 10 }}分钟</span>
+          </div>
+          <div class="scan-info-item">
+            <span class="info-label">任务线程:</span>
+            <span class="info-value">{{ settingStore.setting?.jobThreadCount || 1 }}个</span>
+          </div>
+        </div>
+      </template>
       <SectionDivider />
 
       <SubsectionTitle title="存储列表" />
@@ -11,6 +29,10 @@
           <input v-model="searchName" type="text" placeholder="搜索存储名称..." class="search-input" @input="handleSearch">
         </div>
         <div class="action-buttons-group">
+          <button @click="scanTopFiles" class="btn btn-info" :disabled="scanTopLoading">
+            <Icons name="search" size="1rem" class="btn-icon" />
+            {{ scanTopLoading ? '扫描中...' : '扫描所有文件' }}
+          </button>
           <button @click="fetchStorages" class="btn btn-secondary" :disabled="loading">
             <Icons name="refresh" size="1rem" class="btn-icon" />
             {{ loading ? '刷新中...' : '刷新' }}
@@ -107,7 +129,7 @@
                   </button>
                   <button @click="refreshStorage(storage)" class="btn btn-sm btn-warning" :disabled="refreshingStorageIds.has(storage.id)">
                     <Icons name="refresh" size="0.875rem" class="btn-icon" />
-                    {{ refreshingStorageIds.has(storage.id) ? '刷新中...' : '刷新索引' }}
+                    {{ refreshingStorageIds.has(storage.id) ? '扫描中...' : '扫描文件' }}
                   </button>
                   <button @click="deleteStorage(storage)" class="btn btn-sm btn-danger">
                     删除
@@ -218,6 +240,10 @@ import { toast } from '@/utils/toast'
 import { confirmDialog } from '@/utils/confirm'
 import Select from '@/components/Select.vue'
 import Pagination from '@/components/Pagination.vue'
+import { useSettingStore } from '@/stores/setting'
+
+// Store 实例
+const settingStore = useSettingStore()
 
 // 响应式数据
 const loading = ref(false)
@@ -235,6 +261,7 @@ const bindingStorage = ref<Storage | null>(null)
 const selectedTokenId = ref('')
 const refreshingStorageIds = ref<Set<number>>(new Set())
 const toggleAutoScanLoading = ref<Set<number>>(new Set())
+const scanTopLoading = ref(false)
 
 // 新存储表单数据
 const newStorage = reactive({
@@ -548,6 +575,39 @@ const toggleAutoScan = async (storage: Storage) => {
   }
 }
 
+// 扫描所有文件
+const scanTopFiles = async () => {
+  // 显示提示弹窗
+  const confirmed = await confirmDialog({
+    title: '扫描所有文件',
+    message: '此操作会扫描所有启用了自动扫描的存储。对于禁用自动扫描的存储，需要手动点击"扫描文件"按钮进行扫描。是否开始扫描？',
+    confirmText: '开始扫描',
+    cancelText: '取消',
+    isDanger: false
+  })
+
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    scanTopLoading.value = true
+    const response = await storageApi.scanTop()
+    toast.success(response.message + '，如果存储禁用了自动扫描，需要手动点击"扫描文件"按钮进行扫描')
+    // 刷新存储列表以查看任务状态
+    fetchStorages()
+  } catch (error: any) {
+    if (error?.msg) {
+      toast.error(error.msg)
+    } else {
+      toast.error('扫描所有文件失败')
+    }
+    console.error('扫描所有文件失败:', error)
+  } finally {
+    scanTopLoading.value = false
+  }
+}
+
 // 搜索处理
 let searchTimer: NodeJS.Timeout
 const handleSearch = () => {
@@ -568,6 +628,8 @@ onMounted(() => {
 
   fetchStorages()
   fetchAvailableTokens()
+  // 获取设置信息以显示扫描配置
+  settingStore.fetchSetting()
 })
 </script>
 
@@ -937,6 +999,43 @@ onMounted(() => {
 
 .action-buttons-group .btn:hover:not(:disabled) .btn-icon {
   transform: scale(1.1);
+}
+
+/* 扫描信息面板样式 */
+.scan-info-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  min-width: 200px;
+}
+
+.scan-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.info-label {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.info-value {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.status-enabled {
+  color: #059669;
+}
+
+.status-disabled {
+  color: #dc2626;
 }
 
 /* 任务状态样式 */

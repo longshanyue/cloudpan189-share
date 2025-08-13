@@ -67,9 +67,18 @@ jobs:
           # 生成 Docker 标签
           TAGS="${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}"
           
-          # 如果不是预发布版本（不包含 '-'），则添加 latest 标签
-          if [[ "${{ env.APP_VERSION }}" != *"-"* ]]; then
+          # 检查是否为 alpha 版本
+          if [[ "${{ env.APP_VERSION }}" == *"alpha"* ]]; then
+            # Alpha 版本：添加 alpha 标签，不添加 latest
+            TAGS="${TAGS},${{ env.DOCKERHUB_REPO }}:alpha"
+            echo "🔖 检测到 Alpha 版本，将发布为 alpha 标签"
+          elif [[ "${{ env.APP_VERSION }}" != *"-"* ]]; then
+            # 正式版本：添加 latest 标签
             TAGS="${TAGS},${{ env.DOCKERHUB_REPO }}:latest"
+            echo "🔖 检测到正式版本，将发布为 latest 标签"
+          else
+            # 其他预发布版本：不添加额外标签
+            echo "🔖 检测到预发布版本，仅使用版本标签"
           fi
           
           echo "TAGS=${TAGS}" >> $GITHUB_ENV
@@ -101,10 +110,12 @@ jobs:
           echo "🎉 Docker 镜像构建完成！"
           echo ""
           echo "📦 镜像标签:"
-          if [[ "${{ env.APP_VERSION }}" != *"-"* ]]; then
+          echo "  - ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}"
+          if [[ "${{ env.APP_VERSION }}" == *"alpha"* ]]; then
+            echo "  - ${{ env.DOCKERHUB_REPO }}:alpha"
+          elif [[ "${{ env.APP_VERSION }}" != *"-"* ]]; then
             echo "  - ${{ env.DOCKERHUB_REPO }}:latest"
           fi
-          echo "  - ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}"
           echo ""
           echo "🏗️ 支持的架构:"
           echo "  - linux/amd64"
@@ -118,16 +129,38 @@ jobs:
           echo ""
           echo "🚀 使用方法:"
           echo ""
-          echo "# 基本运行"
-          echo "docker run -d \\"
-          echo "  --name ${{ env.APP_NAME }} \\"
-          echo "  -p 12395:12395 \\"
-          echo "  -v \$(pwd)/data:/app/data \\"
-          echo "  --restart unless-stopped \\"
-          echo "  ${{ env.DOCKERHUB_REPO }}:latest"
-          echo ""
-          echo "# 指定架构运行"
-          echo "docker run --platform linux/arm64 -d ${{ env.DOCKERHUB_REPO }}:latest"
+          # 根据版本类型显示不同的使用示例
+          if [[ "${{ env.APP_VERSION }}" == *"alpha"* ]]; then
+            echo "# Alpha 版本运行 (测试用途)"
+            echo "docker run -d \\"
+            echo "  --name ${{ env.APP_NAME }}-alpha \\"
+            echo "  -p 12395:12395 \\"
+            echo "  -v \$(pwd)/data:/app/data \\"
+            echo "  --restart unless-stopped \\"
+            echo "  ${{ env.DOCKERHUB_REPO }}:alpha"
+            echo ""
+            echo "# 指定版本运行"
+            echo "docker run -d ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}"
+          else
+            echo "# 基本运行"
+            echo "docker run -d \\"
+            echo "  --name ${{ env.APP_NAME }} \\"
+            echo "  -p 12395:12395 \\"
+            echo "  -v \$(pwd)/data:/app/data \\"
+            echo "  --restart unless-stopped \\"
+            if [[ "${{ env.APP_VERSION }}" != *"-"* ]]; then
+              echo "  ${{ env.DOCKERHUB_REPO }}:latest"
+            else
+              echo "  ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}"
+            fi
+            echo ""
+            echo "# 指定架构运行"
+            if [[ "${{ env.APP_VERSION }}" != *"-"* ]]; then
+              echo "docker run --platform linux/arm64 -d ${{ env.DOCKERHUB_REPO }}:latest"
+            else
+              echo "docker run --platform linux/arm64 -d ${{ env.DOCKERHUB_REPO }}:${{ env.APP_VERSION }}"
+            fi
+          fi
           echo ""
           echo "# Docker Compose 示例"
           echo "version: '3.8'"

@@ -130,6 +130,10 @@ export interface ToggleAutoScanResponse {
   msg: string
 }
 
+export interface ScanTopResponse {
+  message: string
+}
+
 // 存储API
 export const storageApi = {
   // 添加存储
@@ -170,5 +174,10 @@ export const storageApi = {
   // 切换自动扫描设置
   toggleAutoScan: (data: ToggleAutoScanRequest): Promise<ToggleAutoScanResponse> => {
     return api.post('/storage/toggle_auto_scan', data)
+  },
+
+  // 扫描顶层文件
+  scanTop: (): Promise<ScanTopResponse> => {
+    return api.post('/storage/scan_top')
   }
 }
