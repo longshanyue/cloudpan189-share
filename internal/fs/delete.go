@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"os"
+
 	"github.com/pkg/errors"
 	"github.com/xxcheng123/cloudpan189-share/configs"
+	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"os"
 )
 
 func (f *fs) Delete(ctx context.Context, id int64) error {
@@ -104,7 +106,7 @@ func (f *fs) getFilePathFromAddition(file *models.VirtualFile) string {
 		return ""
 	}
 
-	if filePath, ok := file.Addition["file_path"].(string); ok {
+	if filePath, ok := file.Addition[consts.FileAdditionKeyFilePath].(string); ok {
 		return filePath
 	}
 

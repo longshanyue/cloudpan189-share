@@ -10,6 +10,7 @@ import (
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/samber/lo"
 	"github.com/xxcheng123/cloudpan189-interface/client"
+	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"github.com/xxcheng123/cloudpan189-share/internal/fs"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
@@ -322,7 +323,7 @@ func (w *diffWorker) processSubfoldersParallel(ctx context.Context, folders []Fi
 }
 
 func (w *diffWorker) getSubscribeUserFiles(ctx context.Context, f File) ([]File, error) {
-	_userId, ok := f.Addition["subscribe_user"]
+	_userId, ok := f.Addition[consts.FileAdditionKeySubscribeUser]
 	if !ok {
 		return nil, errors.New("no subscribe_user")
 	}
@@ -353,9 +354,9 @@ func (w *diffWorker) getSubscribeUserFiles(ctx context.Context, f File) ([]File,
 				ModifyDate: v.LastOpTime,
 				OsType:     models.OsTypeSubscribeShare,
 				Addition: map[string]any{
-					"subscribe_user": userId,
-					"share_id":       v.ShareId,
-					"file_id":        v.Id,
+					consts.FileAdditionKeySubscribeUser: userId,
+					consts.FileAdditionKeyShareId:       v.ShareId,
+					consts.FileAdditionKeyFileId:        v.Id,
 				},
 				Rev: v.Rev,
 			})
@@ -400,9 +401,9 @@ func (w *diffWorker) getSubscribeUserFiles(ctx context.Context, f File) ([]File,
 							ModifyDate: v.LastOpTime,
 							OsType:     models.OsTypeSubscribeShare,
 							Addition: map[string]any{
-								"subscribe_user": userId,
-								"share_id":       v.ShareId,
-								"file_id":        v.Id,
+								consts.FileAdditionKeySubscribeUser: userId,
+								consts.FileAdditionKeyShareId:       v.ShareId,
+								consts.FileAdditionKeyFileId:        v.Id,
 							},
 							Rev: v.Rev,
 						})
@@ -427,17 +428,17 @@ func (w *diffWorker) getSubscribeUserFiles(ctx context.Context, f File) ([]File,
 }
 
 func (w *diffWorker) getSubscribeShareFiles(ctx context.Context, f File) ([]File, error) {
-	_userId, ok := f.Addition["subscribe_user"]
+	_userId, ok := f.Addition[consts.FileAdditionKeySubscribeUser]
 	if !ok {
 		return nil, errors.New("no subscribe_user")
 	}
 
-	_shareId, ok := f.Addition["share_id"]
+	_shareId, ok := f.Addition[consts.FileAdditionKeyShareId]
 	if !ok {
 		return nil, errors.New("no share_id")
 	}
 
-	_fileId, ok := f.Addition["file_id"]
+	_fileId, ok := f.Addition[consts.FileAdditionKeyFileId]
 	if !ok {
 		return nil, errors.New("no file_id")
 	}
@@ -472,9 +473,9 @@ func (w *diffWorker) getSubscribeShareFiles(ctx context.Context, f File) ([]File
 			ModifyDate: v.LastOpTime,
 			OsType:     models.OsTypeSubscribeShare,
 			Addition: map[string]any{
-				"subscribe_user": userId,
-				"share_id":       shareId,
-				"file_id":        v.Id,
+				consts.FileAdditionKeySubscribeUser: userId,
+				consts.FileAdditionKeyShareId:       shareId,
+				consts.FileAdditionKeyFileId:        v.Id,
 			},
 			Rev: v.Rev,
 		})
@@ -492,9 +493,9 @@ func (w *diffWorker) getSubscribeShareFiles(ctx context.Context, f File) ([]File
 			ModifyDate: v.LastOpTime,
 			OsType:     models.OsTypeFile,
 			Addition: map[string]any{
-				"subscribe_user": userId,
-				"share_id":       shareId,
-				"file_id":        v.Id,
+				consts.FileAdditionKeySubscribeUser: userId,
+				consts.FileAdditionKeyShareId:       shareId,
+				consts.FileAdditionKeyFileId:        v.Id,
 			},
 			Rev: v.Rev,
 		})
@@ -540,9 +541,9 @@ func (w *diffWorker) getSubscribeShareFiles(ctx context.Context, f File) ([]File
 						ModifyDate: v.LastOpTime,
 						OsType:     models.OsTypeSubscribeShare,
 						Addition: map[string]any{
-							"subscribe_user": userId,
-							"share_id":       shareId,
-							"file_id":        v.Id,
+							consts.FileAdditionKeySubscribeUser: userId,
+							consts.FileAdditionKeyShareId:       shareId,
+							consts.FileAdditionKeyFileId:        v.Id,
 						},
 						Rev: v.Rev,
 					})
@@ -560,9 +561,9 @@ func (w *diffWorker) getSubscribeShareFiles(ctx context.Context, f File) ([]File
 						ModifyDate: v.LastOpTime,
 						OsType:     models.OsTypeFile,
 						Addition: map[string]any{
-							"subscribe_user": userId,
-							"share_id":       shareId,
-							"file_id":        v.Id,
+							consts.FileAdditionKeySubscribeUser: userId,
+							consts.FileAdditionKeyShareId:       shareId,
+							consts.FileAdditionKeyFileId:        v.Id,
 						},
 						Rev: v.Rev,
 					})
@@ -586,35 +587,35 @@ func (w *diffWorker) getSubscribeShareFiles(ctx context.Context, f File) ([]File
 }
 
 func (w *diffWorker) getShareFiles(ctx context.Context, f File) ([]File, error) {
-	var vv, ok = f.Addition["share_id"]
+	var vv, ok = f.Addition[consts.FileAdditionKeyShareId]
 	if !ok {
 		return nil, errors.New("no share_id")
 	}
 
 	shareId, _ := utils.Int64(vv)
 
-	vv, ok = f.Addition["file_id"]
+	vv, ok = f.Addition[consts.FileAdditionKeyFileId]
 	if !ok {
 		return nil, errors.New("no file_id")
 	}
 
 	fileId := utils.String(vv)
 
-	vv, ok = f.Addition["share_mode"]
+	vv, ok = f.Addition[consts.FileAdditionKeyShareMode]
 	if !ok {
 		return nil, errors.New("no share_mode")
 	}
 
 	shareMode, _ := utils.Int(vv)
 
-	vv, ok = f.Addition["access_code"]
+	vv, ok = f.Addition[consts.FileAdditionKeyAccessCode]
 	if !ok {
 		return nil, errors.New("no access_code")
 	}
 
 	accessCode := utils.String(vv)
 
-	vv, ok = f.Addition["is_folder"]
+	vv, ok = f.Addition[consts.FileAdditionKeyIsFolder]
 	if !ok {
 		return nil, errors.New("no is_folder")
 	}
@@ -624,9 +625,9 @@ func (w *diffWorker) getShareFiles(ctx context.Context, f File) ([]File, error) 
 		pageSize = 200
 		files    = make([]File, 0)
 		addMpFn  = func(mp map[string]any) map[string]any {
-			mp["share_id"] = shareId
-			mp["share_mode"] = shareMode
-			mp["access_code"] = accessCode
+			mp[consts.FileAdditionKeyShareId] = shareId
+			mp[consts.FileAdditionKeyShareMode] = shareMode
+			mp[consts.FileAdditionKeyAccessCode] = accessCode
 
 			return mp
 		}
@@ -656,8 +657,8 @@ func (w *diffWorker) getShareFiles(ctx context.Context, f File) ([]File, error) 
 			ModifyDate: v.LastOpTime,
 			OsType:     models.OsTypeShare,
 			Addition: addMpFn(map[string]any{
-				"file_id":   v.Id,
-				"is_folder": true,
+				consts.FileAdditionKeyFileId:   v.Id,
+				consts.FileAdditionKeyIsFolder: true,
 			}),
 			Rev: v.Rev,
 		})
@@ -675,8 +676,8 @@ func (w *diffWorker) getShareFiles(ctx context.Context, f File) ([]File, error) 
 			ModifyDate: v.LastOpTime,
 			OsType:     models.OsTypeFile,
 			Addition: addMpFn(map[string]any{
-				"file_id":   v.Id,
-				"is_folder": false,
+				consts.FileAdditionKeyFileId:   v.Id,
+				consts.FileAdditionKeyIsFolder: false,
 			}),
 			Rev: v.Rev,
 		})
@@ -722,8 +723,8 @@ func (w *diffWorker) getShareFiles(ctx context.Context, f File) ([]File, error) 
 						ModifyDate: v.LastOpTime,
 						OsType:     models.OsTypeShare,
 						Addition: addMpFn(map[string]any{
-							"file_id":   v.Id,
-							"is_folder": true,
+							consts.FileAdditionKeyFileId:   v.Id,
+							consts.FileAdditionKeyIsFolder: true,
 						}),
 						Rev: v.Rev,
 					})
@@ -741,8 +742,8 @@ func (w *diffWorker) getShareFiles(ctx context.Context, f File) ([]File, error) 
 						ModifyDate: v.LastOpTime,
 						OsType:     models.OsTypeFile,
 						Addition: addMpFn(map[string]any{
-							"file_id":   v.Id,
-							"is_folder": false,
+							consts.FileAdditionKeyFileId:   v.Id,
+							consts.FileAdditionKeyIsFolder: false,
 						}),
 						Rev: v.Rev,
 					})

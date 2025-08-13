@@ -3,6 +3,7 @@ package storage
 import (
 	"net/http"
 
+	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 
 	"github.com/gin-gonic/gin"
@@ -48,7 +49,7 @@ func (s *service) ModifyToken() gin.HandlerFunc {
 			return
 		}
 
-		file.Addition["cloud_token"] = req.CloudToken
+		file.Addition[consts.FileAdditionKeyCloudToken] = req.CloudToken
 
 		result := s.db.Model(&models.VirtualFile{}).Where("id = ?", req.ID).Update("addition", file.Addition)
 

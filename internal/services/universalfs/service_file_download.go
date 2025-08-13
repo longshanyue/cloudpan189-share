@@ -550,7 +550,7 @@ func (s *service) getFileDownloadURL(ctx context.Context, id int64) (string, int
 
 	result, err := client.New().WithToken(client.NewAuthToken(ct.AccessToken, ct.ExpiresIn)).
 		GetFileDownload(ctx, client.String(fileId), func(req *client.GetFileDownloadRequest) {
-			if v, ok := file.Addition["share_id"]; ok {
+			if v, ok := file.Addition[consts.FileAdditionKeyShareId]; ok {
 				req.ShareId, _ = utils.Int64(v)
 			}
 		})
