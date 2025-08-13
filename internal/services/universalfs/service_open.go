@@ -64,8 +64,19 @@ func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 			vPath, _         = ctx.Get(consts.CtxKeyFullPaths)
 			fullPaths        = utils.StringSlice(vPath)
 			vGroupFileSet, _ = ctx.Get(consts.CtxKeyGroupFileSet)
-			groupFileSet     = vGroupFileSet.(mapset.Set[int64])
 		)
+
+		groupFileSet, ok := vGroupFileSet.(mapset.Set[int64])
+		if !ok {
+			s.logger.Error("获取用户组文件集合失败",
+				zap.Int64("fileId", fid),
+				zap.Int64("parentId", pid))
+			ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+				Code:    http.StatusInternalServerError,
+				Message: "获取用户组文件集合失败",
+			})
+			return
+		}
 
 		f := &FileInfo{
 			VirtualFile: file,

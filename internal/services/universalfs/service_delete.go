@@ -76,9 +76,6 @@ func (s *service) Delete() gin.HandlerFunc {
 
 		s.logger.Info("文件删除成功", zap.String("path", rawPath), zap.Int64("fileId", fid), zap.String("fileName", file.Name))
 
-		ctx.JSON(http.StatusNoContent, types.ErrResponse{
-			Code:    http.StatusNoContent,
-			Message: "删除成功",
-		})
+		ctx.Status(http.StatusNoContent)
 	}
 }

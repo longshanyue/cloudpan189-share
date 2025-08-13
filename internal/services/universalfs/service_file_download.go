@@ -105,10 +105,14 @@ func (s *service) FileDownload() gin.HandlerFunc {
 		}
 
 		if v, ok := s.cache.Get(fmt.Sprintf("file::url::%d", req.ID)); ok {
-			ctx.Header("X-Download-Url-Cache", "true")
-			s.doResponse(ctx, v.(string))
-
-			return
+			if url, ok := v.(string); ok {
+				ctx.Header("X-Download-Url-Cache", "true")
+				s.doResponse(ctx, url)
+				return
+			} else {
+				s.logger.Warn("缓存中的URL格式错误", zap.Int64("fileId", req.ID))
+				// 继续执行，重新获取下载链接
+			}
 		}
 
 		file := &models.VirtualFile{}
@@ -146,7 +150,18 @@ func (s *service) handleRealFileDownload(ctx *gin.Context, file *models.VirtualF
 		return
 	}
 
-	filePath := v.(string)
+	filePath, ok := v.(string)
+	if !ok {
+		s.logger.Error("真实文件路径格式错误",
+			zap.Int64("fileId", fileID),
+			zap.String("fileName", file.Name))
+		ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+			Code:    http.StatusInternalServerError,
+			Message: "文件路径格式错误",
+		})
+
+		return
+	}
 	fullPath := path.Join(configs.GetConfig().FileDir, filePath)
 
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
@@ -195,7 +210,16 @@ func (s *service) handleCloudFileDownload(ctx *gin.Context, fileID int64) {
 		return
 	}
 
-	result := _result.(*DoResult)
+	result, ok := _result.(*DoResult)
+	if !ok {
+		s.logger.Error("类型断言失败", zap.Int64("fileId", fileID))
+		ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+			Code:    http.StatusInternalServerError,
+			Message: "内部错误",
+		})
+		return
+	}
+
 	if result.Err != nil {
 		s.logger.Error("处理文件下载请求失败",
 			zap.Int64("fileId", fileID),
@@ -573,6 +597,7 @@ func (s *service) getFileDownloadURL(ctx context.Context, id int64) (string, int
 
 		return "", http.StatusInternalServerError, err
 	}
+	defer resp.Body.Close()
 
 	finalUrl := resp.Request.URL.String()
 	s.cache.Set(fmt.Sprintf("file::url::%d", file.ID), finalUrl, time.Minute)
