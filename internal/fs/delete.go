@@ -3,14 +3,14 @@ package fs
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"strconv"
 	"github.com/pkg/errors"
 	"github.com/xxcheng123/cloudpan189-share/configs"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"os"
-	"path"
-	"strconv"
 )
 
 func (f *fs) Delete(ctx context.Context, id int64) error {
@@ -128,10 +128,10 @@ func (f *fs) getChildren(ctx context.Context, tx *gorm.DB, parentID int64) ([]mo
 func (f *fs) deleteRealFile(filePath string) error {
 	// filePath 已经是完整路径，或者是相对于 FileDir 的路径
 	var fullPath string
-	if path.IsAbs(filePath) {
+	if filepath.IsAbs(filePath) {
 		fullPath = filePath
 	} else {
-		fullPath = path.Join(configs.GetConfig().FileDir, filePath)
+		fullPath = filepath.Join(configs.GetConfig().FileDir, filePath)
 	}
 
 	// 检查文件是否存在
@@ -151,7 +151,7 @@ func (f *fs) deleteRealFile(filePath string) error {
 }
 
 func (f *fs) deleteRealFolder(folderId int64) error {
-	folderPath := path.Join(configs.GetConfig().FileDir, strconv.FormatInt(folderId, 10))
+	folderPath := filepath.Join(configs.GetConfig().FileDir, strconv.FormatInt(folderId, 10))
 
 	// 检查文件夹是否存在
 	if _, err := os.Stat(folderPath); os.IsNotExist(err) {

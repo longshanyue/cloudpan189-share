@@ -26,7 +26,7 @@ type AutoLoginJob struct {
 func NewAutoLoginJob(db *gorm.DB, logger *zap.Logger) Job {
 	return &AutoLoginJob{
 		db:     db,
-		logger: logger.With(zap.String("job", "scan_file")),
+		logger: logger.With(zap.String("job", "auto_login")),
 	}
 }
 
@@ -60,9 +60,9 @@ func (s *AutoLoginJob) Start(ctx context.Context) error {
 			retryTimesMap := make(map[int64]int)
 
 			tokens = lo.Filter(tokens, func(token *models.CloudToken, index int) bool {
-				val, err := utils.Int(token.Addition)
+				val, err := utils.Int(token.Addition[models.CloudTokenAdditionAutoLoginTimes])
 				if err != nil {
-					return false
+					val = 0 // 如果获取失败，默认为0次重试
 				}
 
 				retryTimesMap[token.ID] = val

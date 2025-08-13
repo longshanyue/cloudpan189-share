@@ -47,10 +47,6 @@ func (s *ScanFileJob) Start(ctx context.Context) error {
 
 	defer s.mu.Unlock()
 
-	if s.running {
-		return ErrJobRunning
-	}
-
 	s.running = true
 
 	gopool.Go(func() {
@@ -144,9 +140,11 @@ func (s *ScanFileJob) doJob(ctx context.Context) bool {
 }
 
 func (s *ScanFileJob) Stop() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
 	if s.running {
 		s.cancel()
-
 		s.running = false
 	}
 }
@@ -197,7 +195,7 @@ func (s *ScanFileJob) buildStrm(ctx context.Context, f *models.VirtualFile) erro
 
 		if subFile.IsFolder == 1 {
 			if err := s.buildStrm(ctx, subFile); err != nil {
-				s.logger.Error("failed to build strm for %s", zap.Error(err), zap.String("file_name", subFile.Name))
+				s.logger.Error("failed to build strm", zap.Error(err), zap.String("file_name", subFile.Name))
 
 				errs = append(errs, fmt.Errorf("failed to build strm for %s: %w", subFile.Name, err))
 			}

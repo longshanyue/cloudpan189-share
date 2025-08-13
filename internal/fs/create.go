@@ -49,6 +49,11 @@ func (f *fs) BatchCreate(ctx context.Context, pid int64, files ...File) (count i
 		return 0, RootDirProhibitsCreateFile
 	}
 
+	// 先设置 ParentId
+	for _, file := range files {
+		file.ParentId = pid
+	}
+
 	if result := f.getDB(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "parent_id"}, {Name: "name"}},
 		DoNothing: true,
@@ -60,8 +65,6 @@ func (f *fs) BatchCreate(ctx context.Context, pid int64, files ...File) (count i
 		strmFiles := make([]File, 0)
 
 		for _, file := range files {
-			file.ParentId = pid
-
 			if strmFile, ok := GetStrm(file); ok {
 				strmFiles = append(strmFiles, strmFile)
 			}
@@ -89,8 +92,12 @@ func GetStrm(f File) (File, bool) {
 
 	now := time.Now()
 
-	// 计算 size
-	size := len(fmt.Sprintf("%s/api/file_download?id=%d&random=%s&sign=12345678123456781234567812345678&timestamp=-1", shared.Setting.BaseURL, f.ID, uuid.NewString()))
+	// 计算 size - 添加空值检查
+	baseURL := ""
+	if shared.Setting != nil {
+		baseURL = shared.Setting.BaseURL
+	}
+	size := len(fmt.Sprintf("%s/api/file_download?id=%d&random=%s&sign=12345678123456781234567812345678&timestamp=-1", baseURL, f.ID, uuid.NewString()))
 
 	strmFile := &models.VirtualFile{
 		ParentId:   f.ParentId,

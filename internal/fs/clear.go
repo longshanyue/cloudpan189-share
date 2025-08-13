@@ -6,7 +6,7 @@ import (
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"go.uber.org/zap"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 )
 
@@ -18,7 +18,7 @@ func (f *fs) ClearOsType(ctx context.Context, osTypes ...string) (int64, error) 
 	// 检查是否需要删除真实文件
 	needDeleteReal := false
 	for _, osType := range osTypes {
-		if osType == "real_file" {
+		if osType == models.OsTypeRealFile {
 			needDeleteReal = true
 
 			break
@@ -52,10 +52,12 @@ func (f *fs) clearAllRealFileFolders() {
 	for _, entry := range entries {
 		if entry.IsDir() {
 			if _, err = strconv.ParseInt(entry.Name(), 10, 64); err == nil {
-				folderPath := path.Join(baseDir, entry.Name())
-				_ = os.RemoveAll(folderPath)
-
-				f.logger.Debug("删除文件夹", zap.String("path", folderPath))
+				folderPath := filepath.Join(baseDir, entry.Name())
+				if err := os.RemoveAll(folderPath); err != nil {
+					f.logger.Error("删除文件夹失败", zap.String("path", folderPath), zap.Error(err))
+				} else {
+					f.logger.Debug("删除文件夹", zap.String("path", folderPath))
+				}
 			}
 		}
 	}
