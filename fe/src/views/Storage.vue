@@ -2,6 +2,24 @@
   <Layout>
     <!-- 存储管理主卡片 -->
     <PageCard title="存储管理" subtitle="管理存储挂载点和令牌绑定">
+      <template #extra>
+        <div class="scan-info-panel">
+          <div class="scan-info-item">
+            <span class="info-label">自动扫描:</span>
+            <span class="info-value" :class="settingStore.setting?.enableTopFileAutoRefresh ? 'status-enabled' : 'status-disabled'">
+              {{ settingStore.setting?.enableTopFileAutoRefresh ? '已开启' : '已关闭' }}
+            </span>
+          </div>
+          <div class="scan-info-item">
+            <span class="info-label">扫描间隔:</span>
+            <span class="info-value">{{ settingStore.setting?.autoRefreshMinutes || 10 }}分钟</span>
+          </div>
+          <div class="scan-info-item">
+            <span class="info-label">任务线程:</span>
+            <span class="info-value">{{ settingStore.setting?.jobThreadCount || 1 }}个</span>
+          </div>
+        </div>
+      </template>
       <SectionDivider />
 
       <SubsectionTitle title="存储列表" />
@@ -11,6 +29,18 @@
           <input v-model="searchName" type="text" placeholder="搜索存储名称..." class="search-input" @input="handleSearch">
         </div>
         <div class="action-buttons-group">
+          <button 
+            v-if="selectedCount > 0" 
+            @click="openBatchBindModal" 
+            class="btn btn-warning"
+          >
+            <Icons name="link" size="1rem" class="btn-icon" />
+            批量绑定令牌 ({{ selectedCount }})
+          </button>
+          <button @click="scanTopFiles" class="btn btn-info" :disabled="scanTopLoading">
+            <Icons name="search" size="1rem" class="btn-icon" />
+            {{ scanTopLoading ? '扫描中...' : '扫描所有文件' }}
+          </button>
           <button @click="fetchStorages" class="btn btn-secondary" :disabled="loading">
             <Icons name="refresh" size="1rem" class="btn-icon" />
             {{ loading ? '刷新中...' : '刷新' }}
@@ -38,6 +68,14 @@
         <table v-else class="storage-table">
           <thead>
             <tr>
+              <th style="width: 50px; text-align: center">
+                <input 
+                  type="checkbox" 
+                  :checked="isAllSelected" 
+                  @change="toggleSelectAll"
+                  class="checkbox"
+                />
+              </th>
               <th style="text-align: center">序号</th>
               <th style="text-align: center">挂载路径</th>
               <th style="text-align: center">协议类型</th>
@@ -45,11 +83,19 @@
               <th style="text-align: center">令牌绑定</th>
               <th style="text-align: center">创建时间</th>
               <th style="text-align: center">修改时间</th>
-              <th style="text-align: center">操作</th>
+              <th style="width: 350px; text-align: center">操作</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(storage, index) in storages" :key="storage.id" class="storage-row">
+              <td>
+                <input 
+                  type="checkbox" 
+                  :checked="selectedStorageIds.has(storage.id)"
+                  @change="toggleStorageSelection(storage.id)"
+                  class="checkbox"
+                />
+              </td>
               <td>{{ (currentPage - 1) * pageSize + index + 1 }}</td>
               <td>
                 <div class="storage-info">
@@ -97,6 +143,17 @@
                 <div class="action-buttons">
                   <button @click="bindToken(storage)" class="btn btn-sm btn-secondary">
                     {{ storage.addition.cloud_token ? '重绑令牌' : '绑定令牌' }}
+                  </button>
+                  <button @click="toggleAutoScan(storage)" class="btn btn-sm" 
+                    :class="storage.addition.disable_auto_scan ? 'btn-success' : 'btn-info'"
+                    :disabled="toggleAutoScanLoading.has(storage.id)">
+                    <Icons :name="storage.addition.disable_auto_scan ? 'play' : 'pause'" size="0.875rem" class="btn-icon" />
+                    {{ toggleAutoScanLoading.has(storage.id) ? '处理中...' : 
+                       (storage.addition.disable_auto_scan ? '启用扫描' : '禁用扫描') }}
+                  </button>
+                  <button @click="refreshStorage(storage)" class="btn btn-sm btn-warning" :disabled="refreshingStorageIds.has(storage.id)">
+                    <Icons name="refresh" size="0.875rem" class="btn-icon" />
+                    {{ refreshingStorageIds.has(storage.id) ? '扫描中...' : '扫描文件' }}
                   </button>
                   <button @click="deleteStorage(storage)" class="btn btn-sm btn-danger">
                     删除
@@ -190,6 +247,39 @@
         </div>
       </div>
     </div>
+
+    <!-- 批量绑定令牌弹窗 -->
+    <div v-if="showBatchBindModal" class="modal-overlay" @click="closeBatchBindModal">
+      <div class="modal-content small" @click.stop>
+        <div class="modal-header">
+          <h3>批量绑定令牌</h3>
+          <button @click="closeBatchBindModal" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="bind-info">
+            将为 <strong>{{ selectedCount }}</strong> 个存储批量绑定令牌
+          </p>
+          <div class="form-group">
+            <label class="form-label">选择令牌</label>
+            <Select v-model="batchSelectedTokenId" :options="tokenOptions" placeholder="请选择令牌" />
+          </div>
+          <div class="selected-storages">
+            <h4>已选择的存储：</h4>
+            <ul>
+              <li v-for="storage in storages.filter(s => selectedStorageIds.has(s.id))" :key="storage.id">
+                {{ storage.localPath }}
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="closeBatchBindModal" class="btn btn-secondary">取消</button>
+          <button @click="confirmBatchBindToken" class="btn btn-primary" :disabled="batchBindLoading">
+            {{ batchBindLoading ? '绑定中...' : '确认批量绑定' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </Layout>
 </template>
 
@@ -207,6 +297,10 @@ import { toast } from '@/utils/toast'
 import { confirmDialog } from '@/utils/confirm'
 import Select from '@/components/Select.vue'
 import Pagination from '@/components/Pagination.vue'
+import { useSettingStore } from '@/stores/setting'
+
+// Store 实例
+const settingStore = useSettingStore()
 
 // 响应式数据
 const loading = ref(false)
@@ -222,6 +316,15 @@ const bindLoading = ref(false)
 const availableTokens = ref<CloudToken[]>([])
 const bindingStorage = ref<Storage | null>(null)
 const selectedTokenId = ref('')
+const refreshingStorageIds = ref<Set<number>>(new Set())
+const toggleAutoScanLoading = ref<Set<number>>(new Set())
+const scanTopLoading = ref(false)
+
+// 批量选择相关
+const selectedStorageIds = ref<Set<number>>(new Set())
+const showBatchBindModal = ref(false)
+const batchBindLoading = ref(false)
+const batchSelectedTokenId = ref('')
 
 // 新存储表单数据
 const newStorage = reactive({
@@ -245,6 +348,15 @@ const tokenOptions = computed(() => {
     label: token.name,
     value: token.id
   }))
+})
+
+// 批量选择相关计算属性
+const isAllSelected = computed(() => {
+  return storages.value.length > 0 && storages.value.every(storage => selectedStorageIds.value.has(storage.id))
+})
+
+const selectedCount = computed(() => {
+  return selectedStorageIds.value.size
 })
 
 // 获取存储列表
@@ -408,6 +520,25 @@ const confirmBindToken = async () => {
   }
 }
 
+// 刷新存储索引
+const refreshStorage = async (storage: Storage) => {
+  try {
+    refreshingStorageIds.value.add(storage.id)
+    await storageApi.deepRefreshFile({ id: storage.id })
+    toast.success('刷新指令已发送，请查看任务状态')
+    fetchStorages()
+  } catch (error: any) {
+    if (error?.message) {
+      toast.error(error.message)
+    } else {
+      toast.error('刷新索引失败')
+    }
+    console.error('刷新索引失败:', error)
+  } finally {
+    refreshingStorageIds.value.delete(storage.id)
+  }
+}
+
 // 删除存储
 const deleteStorage = async (storage: Storage) => {
   const confirmed = await confirmDialog({
@@ -479,6 +610,145 @@ const getTokenExpireText = (token: CloudToken | undefined): string => {
   }
 }
 
+// 切换自动扫描
+const toggleAutoScan = async (storage: Storage) => {
+  const currentStatus = storage.addition.disable_auto_scan
+  const action = currentStatus ? '启用' : '禁用'
+  
+  const confirmed = await confirmDialog({
+    title: `${action}自动扫描`,
+    message: `确定要${action}存储 "${storage.localPath}" 的自动扫描吗？`,
+    confirmText: action,
+    cancelText: '取消',
+    isDanger: !currentStatus
+  })
+
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    toggleAutoScanLoading.value.add(storage.id)
+    await storageApi.toggleAutoScan({
+      id: storage.id,
+      disableAutoScan: !currentStatus
+    })
+    toast.success(`${action}自动扫描成功`)
+    fetchStorages()
+  } catch (error: any) {
+    if (error?.message) {
+      toast.error(error.message)
+    } else {
+      toast.error(`${action}自动扫描失败`)
+    }
+    console.error(`${action}自动扫描失败:`, error)
+  } finally {
+    toggleAutoScanLoading.value.delete(storage.id)
+  }
+}
+
+// 扫描所有文件
+const scanTopFiles = async () => {
+  // 显示提示弹窗
+  const confirmed = await confirmDialog({
+    title: '扫描所有文件',
+    message: '此操作会扫描所有启用了自动扫描的存储。对于禁用自动扫描的存储，需要手动点击"扫描文件"按钮进行扫描。是否开始扫描？',
+    confirmText: '开始扫描',
+    cancelText: '取消',
+    isDanger: false
+  })
+
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    scanTopLoading.value = true
+    const response = await storageApi.scanTop()
+    toast.success(response.message + '，如果存储禁用了自动扫描，需要手动点击"扫描文件"按钮进行扫描')
+    // 刷新存储列表以查看任务状态
+    fetchStorages()
+  } catch (error: any) {
+    if (error?.msg) {
+      toast.error(error.msg)
+    } else {
+      toast.error('扫描所有文件失败')
+    }
+    console.error('扫描所有文件失败:', error)
+  } finally {
+    scanTopLoading.value = false
+  }
+}
+
+// 批量选择相关方法
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedStorageIds.value.clear()
+  } else {
+    storages.value.forEach(storage => {
+      selectedStorageIds.value.add(storage.id)
+    })
+  }
+}
+
+const toggleStorageSelection = (storageId: number) => {
+  if (selectedStorageIds.value.has(storageId)) {
+    selectedStorageIds.value.delete(storageId)
+  } else {
+    selectedStorageIds.value.add(storageId)
+  }
+}
+
+const openBatchBindModal = () => {
+  if (selectedStorageIds.value.size === 0) {
+    toast.warning('请先选择要批量绑定的存储')
+    return
+  }
+  showBatchBindModal.value = true
+}
+
+const closeBatchBindModal = () => {
+  showBatchBindModal.value = false
+  batchSelectedTokenId.value = ''
+}
+
+const confirmBatchBindToken = async () => {
+  if (!batchSelectedTokenId.value) {
+    toast.warning('请选择令牌')
+    return
+  }
+
+  if (selectedStorageIds.value.size === 0) {
+    toast.warning('请先选择要批量绑定的存储')
+    return
+  }
+
+  try {
+    batchBindLoading.value = true
+    const result = await storageApi.batchBindToken({
+      ids: Array.from(selectedStorageIds.value),
+      cloudToken: parseInt(batchSelectedTokenId.value)
+    })
+    
+    if (result.successCount > 0) {
+      toast.success(`成功绑定 ${result.successCount} 个存储`)
+    }
+    
+    if (result.failedCount > 0) {
+      toast.warning(`${result.failedCount} 个存储绑定失败`)
+    }
+    
+    closeBatchBindModal()
+    selectedStorageIds.value.clear()
+    fetchStorages()
+  } catch (error) {
+    console.error('批量绑定令牌失败:', error)
+    toast.error('批量绑定令牌失败')
+  } finally {
+    batchBindLoading.value = false
+  }
+}
+
 // 搜索处理
 let searchTimer: NodeJS.Timeout
 const handleSearch = () => {
@@ -499,6 +769,8 @@ onMounted(() => {
 
   fetchStorages()
   fetchAvailableTokens()
+  // 获取设置信息以显示扫描配置
+  settingStore.fetchSetting()
 })
 </script>
 
@@ -592,6 +864,24 @@ onMounted(() => {
   background: #dc2626;
 }
 
+.btn-success {
+  background: #10b981;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: #059669;
+}
+
+.btn-info {
+  background: #0ea5e9;
+  color: white;
+}
+
+.btn-info:hover:not(:disabled) {
+  background: #0284c7;
+}
+
 .btn-sm {
   padding: 0.5rem 0.75rem;
   font-size: 0.75rem;
@@ -677,17 +967,26 @@ onMounted(() => {
 .storage-table th {
   background: #f9fafb;
   padding: 1rem;
-  text-align: left;
+  text-align: center;
   font-weight: 600;
   color: #374151;
   border-bottom: 1px solid #e5e7eb;
   font-size: 0.875rem;
 }
 
+.storage-table th:nth-child(2) {
+  text-align: left;
+}
+
 .storage-table td {
   padding: 1rem;
   border-bottom: 1px solid #f3f4f6;
   font-size: 0.875rem;
+  text-align: center;
+}
+
+.storage-table td:nth-child(2) {
+  text-align: left;
 }
 
 .storage-row:hover {
@@ -760,8 +1059,9 @@ onMounted(() => {
 
 .action-buttons {
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  gap: 0.25rem;
+  flex-wrap: nowrap;
+  justify-content: center;
 }
 
 .action-buttons-group {
@@ -840,6 +1140,43 @@ onMounted(() => {
 
 .action-buttons-group .btn:hover:not(:disabled) .btn-icon {
   transform: scale(1.1);
+}
+
+/* 扫描信息面板样式 */
+.scan-info-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  min-width: 200px;
+}
+
+.scan-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.info-label {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.info-value {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.status-enabled {
+  color: #059669;
+}
+
+.status-disabled {
+  color: #dc2626;
 }
 
 /* 任务状态样式 */
@@ -1101,6 +1438,49 @@ onMounted(() => {
   margin-bottom: 1rem;
   font-size: 0.875rem;
   color: #92400e;
+}
+
+/* 批量绑定弹窗样式 */
+.selected-storages {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.selected-storages h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.selected-storages ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.selected-storages li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.selected-storages li:last-child {
+  border-bottom: none;
+}
+
+/* 复选框样式 */
+.checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #3b82f6;
 }
 
 /* 响应式设计 */

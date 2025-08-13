@@ -1,9 +1,10 @@
-export type JobType = 'del' | 'refresh' | 'deep_refresh';
+export type JobType = 'del' | 'refresh' | 'deep_refresh' | 'scan_top';
 
 export const JobStatusMap = {
   del: '删除',
   refresh: '文件扫描中',
-  deep_refresh: '文件重建索引'
+  deep_refresh: '文件重建索引',
+  scan_top: '扫描顶层文件'
 }
 
 type JobStatus = 0 | 1; // 0: waiting, 1: running

@@ -35,6 +35,7 @@ const (
 	ScanJobRebuildStrm     ScanJobType = "rebuild_strm"
 	ScanJobClearStrm       ScanJobType = "clear_strm"
 	ScanJobClearRealFile   ScanJobType = "clear_real_file"
+	ScanJobTypeScanTop     ScanJobType = "scan_top" // 扫描所有顶层文件
 )
 
 type ScanMsg struct {
@@ -261,4 +262,12 @@ func UpdateJobProgress(fileId int64, scannedCount, waitCount int64) error {
 	jobStat := v.(*JobStat)
 	jobStat.UpdateProgress(scannedCount, waitCount)
 	return nil
+}
+
+// ScanTopJobPublish 发布扫描顶层文件任务的便捷方法
+func ScanTopJobPublish() error {
+	// 使用一个虚拟的文件对象，ID为0表示扫描所有顶层文件
+	virtualFile := &models.VirtualFile{ID: 0}
+
+	return ScanJobPublish(ScanJobTypeScanTop, virtualFile)
 }

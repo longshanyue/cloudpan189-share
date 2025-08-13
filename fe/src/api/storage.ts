@@ -15,6 +15,7 @@ export interface Storage {
     subscribe_user?: string
     share_code?: string
     share_access_code?: string
+    disable_auto_scan?: boolean
   }
   jobStatus?: JobStat
 }
@@ -39,6 +40,17 @@ export interface DeleteStorageRequest {
 export interface ModifyTokenRequest {
   id: number
   cloudToken: number
+}
+
+export interface BatchBindTokenRequest {
+  ids: number[]
+  cloudToken: number
+}
+
+export interface BatchBindTokenResponse {
+  successCount: number
+  failedCount: number
+  failedFiles: number[]
 }
 
 export interface StorageListRequest {
@@ -119,6 +131,20 @@ export interface ClearRealFileResponse {
   message: string
 }
 
+export interface ToggleAutoScanRequest {
+  id: number
+  disableAutoScan: boolean
+}
+
+export interface ToggleAutoScanResponse {
+  code: number
+  msg: string
+}
+
+export interface ScanTopResponse {
+  message: string
+}
+
 // 存储API
 export const storageApi = {
   // 添加存储
@@ -134,6 +160,11 @@ export const storageApi = {
   // 修改令牌绑定
   modifyToken: (data: ModifyTokenRequest): Promise<void> => {
     return api.post('/storage/modify_token', data)
+  },
+
+  // 批量绑定令牌
+  batchBindToken: (data: BatchBindTokenRequest): Promise<BatchBindTokenResponse> => {
+    return api.post('/storage/batch_bind_token', data)
   },
 
   // 获取存储列表
@@ -154,5 +185,15 @@ export const storageApi = {
   // 清空本地真实存储
   clearRealFile: (): Promise<ClearRealFileResponse> => {
     return api.post('/storage/clear_real_file')
+  },
+
+  // 切换自动扫描设置
+  toggleAutoScan: (data: ToggleAutoScanRequest): Promise<ToggleAutoScanResponse> => {
+    return api.post('/storage/toggle_auto_scan', data)
+  },
+
+  // 扫描顶层文件
+  scanTop: (): Promise<ScanTopResponse> => {
+    return api.post('/storage/scan_top')
   }
 }

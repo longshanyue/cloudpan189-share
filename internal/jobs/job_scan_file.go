@@ -12,7 +12,9 @@ import (
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/xxcheng123/cloudpan189-interface/client"
+	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
+	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
 	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -125,14 +127,18 @@ func (s *ScanFileJob) doJob(ctx context.Context) bool {
 			} else {
 				s.logger.Info("删除真存储文件成功", zap.Int64("count", count))
 			}
+		case shared.ScanJobTypeScanTop:
+			if err := s.scanTop(ctx); err != nil {
+				s.logger.Error("扫描顶层文件任务执行失败", zap.Error(err))
+			}
 		}
 	case <-time.After(refreshMinutes * time.Minute):
 		if !shared.Setting.EnableTopFileAutoRefresh {
 			return true
 		}
 		s.logger.Info("scan top file job started")
-		if err := s.scanTop(s.ctx); err != nil {
-			s.logger.Error("scan file error", zap.Error(err))
+		if err := shared.ScanTopJobPublish(); err != nil {
+			s.logger.Error("failed to publish scan top job", zap.Error(err))
 		}
 	}
 
@@ -142,7 +148,7 @@ func (s *ScanFileJob) doJob(ctx context.Context) bool {
 func (s *ScanFileJob) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if s.running {
 		s.cancel()
 		s.running = false
@@ -159,6 +165,19 @@ func (s *ScanFileJob) scanTop(ctx context.Context) error {
 	var errs = make([]error, 0)
 
 	for _, f := range topFiles {
+		// 检查是否设置了禁用自动扫描队列标志（仅is_top=1时生效）
+		if f.IsTop == 1 && f.Addition != nil {
+			if disableAutoScanValue, exists := f.Addition[consts.FileAdditionKeyDisableAutoScan]; exists {
+				if disableAutoScan, err := utils.Bool(disableAutoScanValue); err == nil && disableAutoScan {
+					s.logger.Info("跳过自动扫描，文件已设置禁用自动扫描队列标志",
+						zap.Int64("file_id", f.ID),
+						zap.String("file_name", f.Name))
+
+					continue
+				}
+			}
+		}
+
 		_ = shared.RunningStat(f.ID)
 		if err := newDiffWorker(s.logger, s.db, f.ID).execute(ctx, f, false); err != nil {
 			errs = append(errs, err)

@@ -2,8 +2,15 @@
   <div class="page-section">
     <div class="page-card">
       <div class="card-header">
-        <h1 class="card-title">{{ title }}</h1>
-        <p class="card-subtitle">{{ subtitle }}</p>
+        <div class="header-content">
+          <div class="title-section">
+            <h1 class="card-title">{{ title }}</h1>
+            <p class="card-subtitle">{{ subtitle }}</p>
+          </div>
+          <div class="header-extra" v-if="$slots.extra">
+            <slot name="extra" />
+          </div>
+        </div>
       </div>
       
       <slot />
@@ -40,6 +47,17 @@ defineProps<Props>()
   margin-bottom: 1.5rem;
 }
 
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.title-section {
+  flex: 1;
+}
+
 .card-title {
   font-size: 1.75rem;
   font-weight: 600;
@@ -52,6 +70,12 @@ defineProps<Props>()
   margin: 0;
   font-size: 0.95rem;
   line-height: 1.5;
+}
+
+.header-extra {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
 }
 
 /* 响应式设计 */
