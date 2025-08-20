@@ -1,4 +1,4 @@
-package universalfs
+package enc
 
 import (
 	"crypto/md5"
@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func enc(values url.Values, key string) url.Values {
+func Enc(values url.Values, key string) url.Values {
 	if !values.Has("timestamp") {
 		timestamp := time.Now().Add(time.Hour * 6).Unix()
 		values.Set("timestamp", strconv.FormatInt(timestamp, 10))
@@ -40,14 +40,14 @@ func enc(values url.Values, key string) url.Values {
 	return values
 }
 
-// 验证签名是否有效
-func verify(values url.Values, key string) bool {
+// Verify 验证签名是否有效
+func Verify(values url.Values, key string) bool {
 	// 获取并移除签名
 	sign := values.Get("sign")
 	values.Del("sign")
 
 	// 重新计算签名
-	newValues := enc(values, key)
+	newValues := Enc(values, key)
 	newSign := newValues.Get("sign")
 
 	// 比较签名是否一致

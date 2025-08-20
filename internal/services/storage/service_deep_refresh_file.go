@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/xxcheng123/cloudpan189-share/internal/bus"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -44,7 +45,10 @@ func (s *service) DeepRefreshFile() gin.HandlerFunc {
 			return
 		}
 
-		if err := shared.ScanJobPublish(shared.ScanJobTypeDeepRefresh, file); err != nil {
+		if err := shared.FileBus.Publish(ctx, bus.TopicFileRefreshFile, bus.TopicFileRefreshRequest{
+			FID:  file.ID,
+			Deep: true,
+		}); err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{
 				"code": http.StatusInternalServerError,
 				"msg":  "下方刷新指令失败，请稍后再试",

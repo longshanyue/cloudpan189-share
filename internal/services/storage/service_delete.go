@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"github.com/xxcheng123/cloudpan189-share/internal/bus"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -91,10 +92,12 @@ func (s *service) Delete() gin.HandlerFunc {
 
 		file = scanFile
 
-		if err := shared.ScanJobPublish(shared.ScanJobTypeDel, &file); err != nil {
+		if err := shared.FileBus.Publish(ctx, bus.TopicFileDeleteFile, bus.TopicFileDeleteRequest{
+			FID: file.ID,
+		}); err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"code":    http.StatusInternalServerError,
-				"message": err.Error(),
+				"code": http.StatusInternalServerError,
+				"msg":  err.Error(),
 			})
 
 			return

@@ -16,6 +16,7 @@ const (
 	OsTypeShare          = "share"
 	OsTypeRealFile       = "real_file"
 	OsTypeStrmFile       = "strm_file"
+	OsTypeStrmFileV2     = "strm_file_v2"
 )
 
 type VirtualFile struct {
@@ -39,4 +40,19 @@ type VirtualFile struct {
 
 func (s *VirtualFile) TableName() string {
 	return "virtual_files"
+}
+
+type MediaFile struct {
+	ID        int64     `gorm:"primaryKey" json:"id"`
+	FID       int64     `gorm:"column:fid;type:bigint;not null" json:"fid"` // 与之关联的文件ID
+	Name      string    `gorm:"column:name;type:varchar(255);not null" json:"name"`
+	Path      string    `gorm:"column:path;type:varchar(255);not null" json:"path"` // 包括文件名
+	Size      int64     `gorm:"column:size;type:bigint;not null" json:"size"`
+	Hash      string    `gorm:"column:hash;type:varchar(64);not null" json:"hash"`
+	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime;type:datetime;default:CURRENT_TIMESTAMP" json:"createdAt"`
+	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime;type:datetime;default:CURRENT_TIMESTAMP;on update:CURRENT_TIMESTAMP" json:"updatedAt"`
+}
+
+func (m *MediaFile) TableName() string {
+	return "media_files"
 }

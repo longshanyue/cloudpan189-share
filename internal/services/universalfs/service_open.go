@@ -2,6 +2,7 @@ package universalfs
 
 import (
 	"fmt"
+	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/enc"
 	"net/http"
 	"net/url"
 	"path"
@@ -23,7 +24,6 @@ import (
 )
 
 type openRequest struct {
-	IncludeAutoGenerateStrmFile bool `form:"includeAutoGenerateStrmFile"`
 }
 
 func (s *service) Open(prefix string, format string) gin.HandlerFunc {
@@ -85,7 +85,7 @@ func (s *service) Open(prefix string, format string) gin.HandlerFunc {
 		}
 
 		if file.IsFolder == 1 {
-			if err := s.loadFolderChildren(ctx, f, gid, groupFileSet, format, req); err != nil {
+			if err := s.loadFolderChildren(ctx, f, gid, groupFileSet, format); err != nil {
 				s.logger.Error("加载文件夹子项失败",
 					zap.Int64("fileId", file.ID),
 					zap.String("fileName", file.Name),
@@ -131,7 +131,7 @@ func (s *service) getFileInfo(ctx *gin.Context, fid, pid int64) (*models.Virtual
 	return file, nil
 }
 
-func (s *service) loadFolderChildren(ctx *gin.Context, f *FileInfo, gid int64, groupFileSet mapset.Set[int64], format string, req *openRequest) error {
+func (s *service) loadFolderChildren(ctx *gin.Context, f *FileInfo, gid int64, groupFileSet mapset.Set[int64], format string) error {
 	var list = make([]*models.VirtualFile, 0)
 	if err := s.db.WithContext(ctx).Where("parent_id", f.ID).Find(&list).Error; err != nil {
 		return err
@@ -158,7 +158,7 @@ func (s *service) loadFolderChildren(ctx *gin.Context, f *FileInfo, gid int64, g
 	}
 
 	// 根据格式过滤STRM文件
-	s.filterByFormat(f, format, req)
+	s.filterByFormat(f, format)
 
 	// 排序：文件夹优先，然后按修改时间倒序
 	sort.Slice(f.Children, func(i, j int) bool {
@@ -172,7 +172,7 @@ func (s *service) loadFolderChildren(ctx *gin.Context, f *FileInfo, gid int64, g
 	return nil
 }
 
-func (s *service) filterByFormat(f *FileInfo, format string, req *openRequest) {
+func (s *service) filterByFormat(f *FileInfo, format string) {
 	switch format {
 	case "dav":
 		// DAV格式：过滤掉STRM文件
@@ -192,13 +192,9 @@ func (s *service) filterByFormat(f *FileInfo, format string, req *openRequest) {
 			return lo.IndexOf(linkIds, item.ID) == -1
 		})
 	case "json":
-		// JSON格式：根据参数决定是否包含自动生成的STRM文件
+		// JSON格式：不包含自动生成的STRM文件
 		f.Children = lo.Filter(f.Children, func(item *FileInfo, _ int) bool {
-			if !req.IncludeAutoGenerateStrmFile && item.OsType == models.OsTypeStrmFile {
-				return false
-			}
-
-			return true
+			return item.OsType != models.OsTypeStrmFile
 		})
 	}
 }
@@ -213,7 +209,7 @@ func (s *service) responseByFormat(ctx *gin.Context, f *FileInfo, format string)
 }
 
 func (s *service) generateDownloadURL(fid int64) string {
-	values := enc(url.Values{
+	values := enc.Enc(url.Values{
 		"id":     []string{fmt.Sprintf("%d", fid)},
 		"random": []string{uuid.NewString()},
 	}, shared.Setting.SaltKey)
@@ -224,7 +220,7 @@ func (s *service) generateDownloadURL(fid int64) string {
 }
 
 func (s *service) generateDownloadURLWithNeverExpire(fid int64) string {
-	values := enc(url.Values{
+	values := enc.Enc(url.Values{
 		"id":        []string{fmt.Sprintf("%d", fid)},
 		"random":    []string{uuid.NewString()},
 		"timestamp": []string{"-1"},

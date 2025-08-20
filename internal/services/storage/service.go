@@ -17,7 +17,6 @@ type Service interface {
 	BatchBindToken() gin.HandlerFunc
 	DeepRefreshFile() gin.HandlerFunc
 	Search() gin.HandlerFunc
-	ClearRealFile() gin.HandlerFunc
 	ToggleAutoScan() gin.HandlerFunc
 	ScanTop() gin.HandlerFunc
 }

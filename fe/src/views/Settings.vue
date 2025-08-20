@@ -1,5 +1,5 @@
 <template>
-  <Layout>
+  <div>
     <!-- 系统设置主卡片 -->
     <PageCard title="系统设置" subtitle="管理系统配置和参数设置">
       <SectionDivider />
@@ -52,6 +52,36 @@
               @click="handleModifyBaseURL"
               class="btn btn-primary btn-sm"
               :disabled="loading || !baseURL.trim() || baseURL === originalBaseURL"
+          >
+            {{ loading ? '保存中...' : '保存' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">STRM基础URL</span>
+          <span class="label-desc">设置STRM文件中使用的基础URL，如果为空则使用上面的基础URL</span>
+        </div>
+        <div class="setting-control">
+          <input
+              v-model="strmBaseURL"
+              type="text"
+              class="setting-input"
+              placeholder="留空则使用基础URL"
+              :disabled="loading"
+          >
+          <button
+              @click="handleUseBaseURLForStrm"
+              class="btn btn-secondary btn-sm"
+              :disabled="loading"
+          >
+            使用基础URL
+          </button>
+          <button
+              @click="handleModifyStrmBaseURL"
+              class="btn btn-primary btn-sm"
+              :disabled="loading || strmBaseURL === originalStrmBaseURL"
           >
             {{ loading ? '保存中...' : '保存' }}
           </button>
@@ -319,39 +349,23 @@
         </div>
       </div>
 
-      <!-- 新增：WebDAV写入权限设置 -->
+
+      <!-- 关联文件自动删除设置 -->
       <div class="setting-item">
         <div class="setting-label">
-          <span class="label-text">WebDAV写入权限</span>
-          <span class="label-desc">开启后允许通过WebDAV协议写入和删除真实文件，关闭后WebDAV仅提供只读访问。注意：此功能仅影响真实文件，不包括挂载的分享文件以及strm等虚拟文件，如果父级文件夹被删除，则文件也会被删除。</span>
+          <span class="label-text">关联文件自动删除</span>
+          <span class="label-desc">开启后，当源文件被删除时，系统将自动删除基于源文件生成的关联文件（如STRM文件等）</span>
         </div>
         <div class="setting-control">
-          <div class="custom-switch" @click="handleToggleFileWritable">
+          <div class="custom-switch" @click="handleToggleLinkFileAutoDelete">
             <input
                 type="checkbox"
-                :checked="settingStore.setting?.fileWritable"
+                :checked="settingStore.setting?.linkFileAutoDelete"
                 :disabled="loading"
                 class="switch-input"
             >
             <span class="switch-slider"></span>
           </div>
-        </div>
-      </div>
-
-      <!-- 清空本地真实存储 -->
-      <div class="setting-item">
-        <div class="setting-label">
-          <span class="label-text">清空本地真实存储</span>
-          <span class="label-desc">清空所有本地真实存储的文件，包括 Emby 生成的 nfo 等文件，此操作不可逆，请谨慎使用。此功能不会影响挂载的分享文件和虚拟文件。</span>
-        </div>
-        <div class="setting-control">
-          <button
-              @click="handleClearRealFile"
-              class="btn btn-danger btn-sm"
-              :disabled="loading"
-          >
-            {{ loading ? '清空中...' : '清空本地真实存储' }}
-          </button>
         </div>
       </div>
 
@@ -434,19 +448,17 @@
         </div>
       </div>
     </div>
-  </Layout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useSettingStore } from '@/stores/setting'
-import Layout from '@/components/Layout.vue'
 import PageCard from '@/components/PageCard.vue'
 import SectionDivider from '@/components/SectionDivider.vue'
 import SubsectionTitle from '@/components/SubsectionTitle.vue'
 import { toast } from '@/utils/toast'
 import { confirmDialog } from '@/utils/confirm'
-import { storageApi } from '@/api/storage'
 
 const settingStore = useSettingStore()
 
@@ -469,6 +481,8 @@ const originalMultipleStreamChunkSize = ref(4096) // 用于存储原始多线程
 
 // STRM相关参数
 const strmSupportFileExtList = ref<string[]>([])
+const strmBaseURL = ref('')
+const originalStrmBaseURL = ref('') // 用于存储原始STRM基础URL
 
 // STRM文件格式编辑弹窗相关
 const showStrmExtModal = ref(false)
@@ -561,6 +575,8 @@ const fetchSettingData = async () => {
 
       // 设置STRM相关参数
       strmSupportFileExtList.value = data.strmSupportFileExtList || []
+      strmBaseURL.value = data.strmBaseURL || ''
+      originalStrmBaseURL.value = data.strmBaseURL || ''
     }
   } catch (error) {
     toast.error('获取设置失败')
@@ -745,6 +761,12 @@ const handleAutoFillBaseURL = () => {
   toast.info('已自动获取当前URL')
 }
 
+// 使用基础URL填充STRM基础URL
+const handleUseBaseURLForStrm = () => {
+  strmBaseURL.value = baseURL.value
+  toast.info('已使用基础URL填充STRM基础URL')
+}
+
 // 处理任务线程数变化
 const handleThreadCountChange = () => {
   // 实时更新显示值，但不保存
@@ -853,7 +875,7 @@ const handleToggleStrmFileEnable = async () => {
 
   const confirmed = await confirmDialog({
     title: `${action}STRM文件生成`,
-    message: `确定要${action}STRM文件生成功能吗？${currentStrmFileEnable ? '关闭后会清空所有已生成的STRM文件。' : '开启后系统将为支持的视频文件生成STRM文件。'}`,
+    message: `确定要${action}STRM文件生成功能吗？${currentStrmFileEnable ? '关闭后不会清空所有已生成的STRM文件。' : '开启后系统将为新增的且支持的视频文件生成STRM文件。'}`,
     confirmText: '确认',
     cancelText: '取消',
     isDanger: currentStrmFileEnable
@@ -897,35 +919,6 @@ const handleRebuildStrmFiles = async () => {
   } catch (error) {
     console.error('重建STRM文件失败:', error)
     toast.error('重建STRM文件失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-// 新增：切换WebDAV写入权限
-const handleToggleFileWritable = async () => {
-  const currentFileWritable = settingStore.setting?.fileWritable
-  const action = currentFileWritable ? '关闭' : '开启'
-
-  const confirmed = await confirmDialog({
-    title: `${action}WebDAV写入权限`,
-    message: `确定要${action}WebDAV写入权限吗？${currentFileWritable ? '关闭后WebDAV将变为只读模式。' : '开启后允许通过WebDAV写入和删除真实文件。'}`,
-    confirmText: '确认',
-    cancelText: '取消',
-    isDanger: currentFileWritable
-  })
-
-  if (!confirmed) {
-    return
-  }
-
-  try {
-    loading.value = true
-    await settingStore.toggleFileWritable(!currentFileWritable)
-    toast.success(`WebDAV写入权限已${action}`)
-  } catch (error) {
-    console.error('切换WebDAV写入权限失败:', error)
-    toast.error('切换WebDAV写入权限失败')
   } finally {
     loading.value = false
   }
@@ -1012,14 +1005,34 @@ const saveStrmExtensions = async () => {
   }
 }
 
-// 清空本地真实存储
-const handleClearRealFile = async () => {
+// 修改STRM基础URL
+const handleModifyStrmBaseURL = async () => {
+  try {
+    loading.value = true
+    await settingStore.modifyStrmBaseURL(strmBaseURL.value.trim())
+    originalStrmBaseURL.value = strmBaseURL.value.trim()
+    toast.success('STRM基础URL修改成功')
+  } catch (error) {
+    console.error('修改STRM基础URL失败:', error)
+    toast.error('修改STRM基础URL失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 切换关联文件自动删除
+const handleToggleLinkFileAutoDelete = async () => {
+  if (loading.value) return
+  
+  const currentStatus = settingStore.setting?.linkFileAutoDelete || false
+  const action = currentStatus ? '关闭' : '开启'
+
   const confirmed = await confirmDialog({
-    title: '清空本地真实存储',
-    message: '确定要清空所有本地真实存储的文件吗？包括 Emby 生成的 nfo 等文件，此操作不可逆，请谨慎使用。此功能不会影响挂载的分享文件和虚拟文件。',
-    confirmText: '确认清空',
+    title: `${action}关联文件自动删除`,
+    message: `确定要${action}关联文件自动删除功能吗？${currentStatus ? '关闭后不会自动删除基于源文件生成的关联文件。' : '开启后当源文件被删除时会自动删除基于源文件生成的关联文件（如STRM文件等）。'}`,
+    confirmText: '确认',
     cancelText: '取消',
-    isDanger: true
+    isDanger: false
   })
 
   if (!confirmed) {
@@ -1028,11 +1041,11 @@ const handleClearRealFile = async () => {
 
   try {
     loading.value = true
-    const response = await storageApi.clearRealFile()
-    toast.success(response.message)
+    await settingStore.toggleLinkFileAutoDelete(!currentStatus)
+    toast.success(`关联文件自动删除已${action}`)
   } catch (error) {
-    console.error('清空本地真实存储失败:', error)
-    toast.error('清空本地真实存储失败')
+    console.error('切换关联文件自动删除失败:', error)
+    toast.error('切换关联文件自动删除失败')
   } finally {
     loading.value = false
   }

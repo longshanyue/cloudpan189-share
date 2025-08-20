@@ -90,7 +90,8 @@ func StartHTTPServer() error {
 		settingRouter.POST("/modify_multiple_stream_chunk_size", settingService.ModifyMultipleStreamChunkSize())
 		settingRouter.POST("/toggle_strm_file_enable", settingService.ToggleStrmFileEnable())
 		settingRouter.POST("/modify_strm_support_file_ext_list", settingService.ModifyStrmSupportFileExtList())
-		settingRouter.POST("/toggle_file_writable", settingService.ToggleFileWritable())
+		settingRouter.POST("/toggle_link_file_auto_delete", settingService.ToggleLinkFileAutoDelete())
+		settingRouter.POST("/modify_strm_base_url", settingService.ModifyStrmBaseURL())
 
 		openapiRouter.POST("/setting/init_system", settingService.InitSystem())
 	}
@@ -102,7 +103,6 @@ func StartHTTPServer() error {
 		storageRouter.POST("/modify_token", storageService.ModifyToken())
 		storageRouter.POST("/batch_bind_token", storageService.BatchBindToken())
 		storageRouter.GET("/list", storageService.List())
-		storageRouter.POST("/clear_real_file", storageService.ClearRealFile())
 		storageRouter.POST("/toggle_auto_scan", storageService.ToggleAutoScan())
 		storageRouter.POST("/scan_top", storageService.ScanTop())
 
@@ -140,18 +140,6 @@ func StartHTTPServer() error {
 				"dav",
 				handler,
 			},
-			{
-				"/strm_dav/*path",
-				"/strm_dav",
-				"strm_dav",
-				handler,
-			},
-			{
-				"/strm_dav",
-				"/strm_dav",
-				"strm_dav",
-				handler,
-			},
 		}
 
 		for _, method := range davMethods {
@@ -160,9 +148,6 @@ func StartHTTPServer() error {
 			}
 		}
 
-		for _, r := range registry {
-			engine.Handle(http.MethodPut, r.path, append(r.handlers, universalFsService.Put())...)
-		}
 		for _, r := range registry {
 			engine.Handle(http.MethodDelete, r.path, append(r.handlers, universalFsService.Delete())...)
 		}

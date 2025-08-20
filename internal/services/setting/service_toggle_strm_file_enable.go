@@ -39,25 +39,25 @@ func (s *service) ToggleStrmFileEnable() gin.HandlerFunc {
 			return
 		}
 
-		if req.StrmFileEnable {
-			if err := shared.ScanJobPublish(shared.ScanJobRebuildStrm, new(models.VirtualFile)); err != nil {
-				ctx.JSON(http.StatusInternalServerError, gin.H{
-					"code": http.StatusInternalServerError,
-					"msg":  fmt.Sprintf("下发扫描任务失败：%s", err.Error()),
-				})
-
-				return
-			}
-		} else {
-			if err := shared.ScanJobPublish(shared.ScanJobClearStrm, new(models.VirtualFile)); err != nil {
-				ctx.JSON(http.StatusInternalServerError, gin.H{
-					"code": http.StatusInternalServerError,
-					"msg":  fmt.Sprintf("下发清除任务失败：%s", err.Error()),
-				})
-
-				return
-			}
-		}
+		//if req.StrmFileEnable {
+		//	if err := shared.FileBus.Publish(ctx, bus.TopicFileRebuildMediaFile, bus.TopicFileRebuildMediaFileRequest{}); err != nil {
+		//		ctx.JSON(http.StatusInternalServerError, gin.H{
+		//			"code": http.StatusInternalServerError,
+		//			"msg":  fmt.Sprintf("下发扫描任务失败：%s", err.Error()),
+		//		})
+		//
+		//		return
+		//	}
+		//} else {
+		//	if err := shared.MediaBus.Publish(ctx, bus.TopicMediaClearAllMedia, bus.TopicMediaClearAllMediaRequest{}); err != nil {
+		//		ctx.JSON(http.StatusInternalServerError, gin.H{
+		//			"code": http.StatusInternalServerError,
+		//			"msg":  fmt.Sprintf("下发清除任务失败：%s", err.Error()),
+		//		})
+		//
+		//		return
+		//	}
+		//}
 
 		shared.StrmFileEnable = req.StrmFileEnable
 

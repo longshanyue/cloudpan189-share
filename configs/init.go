@@ -1,5 +1,7 @@
 package configs
 
+//go:generate go run ../cmd/generate_setting/main.go
+
 import (
 	"crypto/md5"
 	"flag"
@@ -106,6 +108,8 @@ func Init() {
 		new(models.UserGroup),
 		new(models.Group2File),
 		new(models.SettingDict),
+		new(models.SystemLog),
+		new(models.MediaFile),
 	); err != nil {
 		panic(err)
 	}
@@ -115,7 +119,7 @@ func Init() {
 			logger2.WithTimeLayout(time.DateTime),
 			logger2.WithFileRotationP(c.LogFile),
 			logger2.WithInfoLevel(),
-			//logger2.WithDebugLevel(),
+			logger2.WithDebugLevel(),
 			logger2.WithOutputInConsole(),
 			logger2.WithField("build_info", fmt.Sprintf("[buildDate:%s]&&[commit:%s]&&[gitSummary:%s]&&[gitBranch:%s]", BuildDate, Commit, GitSummary, GitBranch)),
 		}
@@ -139,20 +143,8 @@ func Init() {
 		panic(err)
 	}
 
-	for _, dict := range dicts {
-		switch dict.Key {
-		case models.SettingDictKeyMultipleStreamThreadCount:
-			shared.MultipleStreamThreadCount = dict.Value.Int()
-		case models.SettingDictKeyMultipleStreamChunkSize:
-			shared.MultipleStreamChunkSize = dict.Value.Int64()
-		case models.SettingDictKeyStrmFileEnable:
-			shared.StrmFileEnable = dict.Value.Bool()
-		case models.SettingDictKeyStrmSupportFileExtList:
-			shared.StrmSupportFileExtList = dict.Value.StringSlice()
-		case models.SettingDictKeyFileWritable:
-			shared.FileWritable = dict.Value.Bool()
-		}
-	}
+	// 使用生成的函数加载设置字典
+	LoadSettingDicts(dicts)
 
 	shared.Setting = setting
 
@@ -161,7 +153,7 @@ func Init() {
 		zap.String("go version", runtime.Version()),
 		zap.String("git commit", Commit),
 		zap.String("git branch", GitBranch),
-		zap.String("git summar", GitSummary),
+		zap.String("git summary", GitSummary),
 	)
 }
 

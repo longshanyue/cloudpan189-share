@@ -1,5 +1,5 @@
 <template>
-  <Layout>
+  <div>
     <!-- 用户管理主卡片 -->
     <PageCard title="用户管理" subtitle="管理系统用户和权限设置">
       <SectionDivider />
@@ -317,7 +317,7 @@
         </div>
       </div>
     </div>
-  </Layout>
+  </div>
 </template>
 
 <script setup lang="ts">

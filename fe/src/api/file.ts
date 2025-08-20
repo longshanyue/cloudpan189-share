@@ -26,11 +26,6 @@ export interface FileItem {
   }
 }
 
-// 获取文件请求参数接口
-export interface GetFileRequest {
-  includeAutoGenerateStrmFile?: boolean // 是否包括STRM文件
-}
-
 // 删除文件响应接口
 export interface DeleteFileResponse {
   code: number
@@ -40,7 +35,7 @@ export interface DeleteFileResponse {
 // 文件API
 export const fileApi = {
   // 获取文件/文件夹信息
-  getFile: (path: string = '', options?: GetFileRequest): Promise<FileItem> => {
+  getFile: (path: string = ''): Promise<FileItem> => {
     // 处理路径，确保正确的API调用
     let url = ''
     if (path) {
@@ -49,20 +44,6 @@ export const fileApi = {
       url = `/open_file/${encodedPath}`
     } else {
       url = '/open_file'
-    }
-
-    // 如果有查询参数，添加到URL中
-    if (options) {
-      const params = new URLSearchParams()
-
-      if (options.includeAutoGenerateStrmFile !== undefined) {
-        params.append('includeAutoGenerateStrmFile', options.includeAutoGenerateStrmFile.toString())
-      }
-
-      const queryString = params.toString()
-      if (queryString) {
-        url += `?${queryString}`
-      }
     }
 
     return api.get(url)

@@ -1,5 +1,5 @@
 <template>
-  <Layout>
+  <div>
     <!-- 存储管理主卡片 -->
     <PageCard title="存储管理" subtitle="管理存储挂载点和令牌绑定">
       <template #extra>
@@ -280,11 +280,10 @@
         </div>
       </div>
     </div>
-  </Layout>
+  </div>
 </template>
 
 <script setup lang="ts">
-import Layout from '@/components/Layout.vue'
 import Icons from '@/components/Icons.vue'
 import PageCard from '@/components/PageCard.vue'
 import SectionDivider from '@/components/SectionDivider.vue'

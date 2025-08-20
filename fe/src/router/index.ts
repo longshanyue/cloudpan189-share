@@ -14,7 +14,6 @@ const router = createRouter({
         title: '文件浏览'
       }
     },
-
     {
       path: '/@init',
       name: 'InitSystem',
@@ -35,72 +34,82 @@ const router = createRouter({
       }
     },
     {
-      path: '/@dashboard',
-      name: 'Dashboard',
-      component: () => import('@/views/Dashboard.vue'),
+      path: '/@admin',
+      name: 'Admin',
+      component: () => import('@/components/Layout.vue'),
       meta: {
         requiresAuth: true,
-        title: '仪表盘'
-      }
-    },
-    {
-      path: '/@users',
-      name: 'Users',
-      component: () => import('@/views/Users.vue'),
-      meta: {
-        requiresAuth: true,
-        requiresAdmin: true,
-        title: '用户管理'
-      }
-    },
-    {
-      path: '/@usergroups',
-      name: 'UserGroups',
-      component: () => import('@/views/UserGroups.vue'),
-      meta: {
-        requiresAuth: true,
-        requiresAdmin: true,
-        title: '用户组管理'
-      }
-    },
-    {
-      path: '/@storage',
-      name: 'Storage',
-      component: () => import('@/views/Storage.vue'),
-      meta: {
-        requiresAuth: true,
-        requiresAdmin: true,
-        title: '存储管理'
-      }
-    },
-    {
-      path: '/@tokens',
-      name: 'CloudToken',
-      component: () => import('@/views/CloudToken.vue'),
-      meta: {
-        requiresAuth: true,
-        requiresAdmin: true,
-        title: '令牌管理'
-      }
-    },
-    {
-      path: '/@setting',
-      name: 'Settings',
-      component: () => import('@/views/Settings.vue'),
-      meta: {
-        requiresAuth: true,
-        requiresAdmin: true,
-        title: '系统设置'
-      }
-    },
-    {
-      path: '/@profile',
-      name: 'Profile',
-      component: () => import('@/views/Profile.vue'),
-      meta: {
-        requiresAuth: true,
-        title: '个人中心'
-      }
+        title: '系统管理'
+      },
+      children: [
+        {
+          path: 'dashboard',
+          name: 'Dashboard',
+          component: () => import('@/views/Dashboard.vue'),
+          meta: {
+            requiresAuth: true,
+            title: '仪表盘'
+          }
+        },
+        {
+          path: 'users',
+          name: 'Users',
+          component: () => import('@/views/Users.vue'),
+          meta: {
+            requiresAuth: true,
+            requiresAdmin: true,
+            title: '用户管理'
+          }
+        },
+        {
+          path: 'user_groups',
+          name: 'UserGroups',
+          component: () => import('@/views/UserGroups.vue'),
+          meta: {
+            requiresAuth: true,
+            requiresAdmin: true,
+            title: '用户组管理'
+          }
+        },
+        {
+          path: 'storage',
+          name: 'Storage',
+          component: () => import('@/views/Storage.vue'),
+          meta: {
+            requiresAuth: true,
+            requiresAdmin: true,
+            title: '存储管理'
+          }
+        },
+        {
+          path: 'cloud_token',
+          name: 'CloudToken',
+          component: () => import('@/views/CloudToken.vue'),
+          meta: {
+            requiresAuth: true,
+            title: '云盘登录'
+          }
+        },
+        {
+          path: 'setting',
+          name: 'Settings',
+          component: () => import('@/views/Settings.vue'),
+          meta: {
+            requiresAuth: true,
+            requiresAdmin: true,
+            title: '系统设置'
+          }
+        },
+        {
+          path: 'profile',
+          name: 'Profile',
+          component: () => import('@/views/Profile.vue'),
+          meta: {
+            requiresAuth: true,
+            title: '个人中心'
+          }
+        },
+      ]
     },
     {
       path: '/:pathMatch(.*)*',
@@ -110,7 +119,7 @@ const router = createRouter({
         requiresAuth: true,
         title: '文件浏览'
       },
-      beforeEnter: (to, from, next) => {
+      beforeEnter: (to, _, next) => {
         // 如果路径指向一个文件（包含文件扩展名），则跳转到文件详情页面
         const path = Array.isArray(to.params.pathMatch) ? to.params.pathMatch.join('/') : to.params.pathMatch || ''
         const lastSegment = path.split('/').pop() || ''
@@ -137,7 +146,7 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _, next) => {
   const authStore = useAuthStore()
   const settingStore = useSettingStore()
   

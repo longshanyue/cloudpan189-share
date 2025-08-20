@@ -8,17 +8,17 @@ import (
 	"net/http"
 )
 
-type toggleFileWritableRequest struct {
-	FileWritable bool `json:"fileWritable"`
+type modifyStrmBaseURLRequest struct {
+	StrmBaseURL string `json:"strmBaseURL"`
 }
 
-type toggleFileWritableResponse struct {
+type modifyStrmBaseURLResponse struct {
 	RowsAffected int64 `json:"rowsAffected"`
 }
 
-func (s *service) ToggleFileWritable() gin.HandlerFunc {
+func (s *service) ModifyStrmBaseURL() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var req = new(toggleFileWritableRequest)
+		var req = new(modifyStrmBaseURLRequest)
 
 		if err := ctx.ShouldBindJSON(&req); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
@@ -29,7 +29,7 @@ func (s *service) ToggleFileWritable() gin.HandlerFunc {
 			return
 		}
 
-		result := new(models.SettingDict).SetFileWritable(s.db.WithContext(ctx), req.FileWritable)
+		result := new(models.SettingDict).SetStrmBaseURL(s.db.WithContext(ctx), req.StrmBaseURL)
 		if result.Error != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{
 				"code": http.StatusInternalServerError,
@@ -39,9 +39,9 @@ func (s *service) ToggleFileWritable() gin.HandlerFunc {
 			return
 		}
 
-		shared.FileWritable = req.FileWritable
+		shared.StrmBaseURL = req.StrmBaseURL
 
-		ctx.JSON(http.StatusOK, toggleFileWritableResponse{
+		ctx.JSON(http.StatusOK, modifyStrmBaseURLResponse{
 			RowsAffected: result.RowsAffected,
 		})
 	}

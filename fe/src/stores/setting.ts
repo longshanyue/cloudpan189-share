@@ -197,17 +197,32 @@ export const useSettingStore = defineStore('setting', () => {
     }
   }
 
-  // 新增：切换文件可写状态
-  const toggleFileWritable = async (enable: boolean) => {
+  // 切换链接文件自动删除状态
+  const toggleLinkFileAutoDelete = async (enable: boolean) => {
     try {
-      await settingApi.toggleFileWritable({
-        fileWritable: enable
+      await settingApi.toggleLinkFileAutoDelete({
+        linkFileAutoDelete: enable
       })
       if (setting.value) {
-        setting.value.fileWritable = enable
+        setting.value.linkFileAutoDelete = enable
       }
     } catch (error) {
-      console.error('切换文件可写状态失败:', error)
+      console.error('切换链接文件自动删除状态失败:', error)
+      throw error
+    }
+  }
+
+  // 修改STRM基础URL
+  const modifyStrmBaseURL = async (strmBaseURL: string) => {
+    try {
+      await settingApi.modifyStrmBaseURL({
+        strmBaseURL: strmBaseURL
+      })
+      if (setting.value) {
+        setting.value.strmBaseURL = strmBaseURL
+      }
+    } catch (error) {
+      console.error('修改STRM基础URL失败:', error)
       throw error
     }
   }
@@ -241,7 +256,8 @@ export const useSettingStore = defineStore('setting', () => {
     modifyMultipleStreamChunkSize,
     toggleStrmFileEnable,
     modifyStrmSupportFileExtList,
-    toggleFileWritable, // 新增
+    toggleLinkFileAutoDelete,
+    modifyStrmBaseURL,
     initSystem
   }
 })

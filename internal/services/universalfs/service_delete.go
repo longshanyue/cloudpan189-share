@@ -2,8 +2,10 @@ package universalfs
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/xxcheng123/cloudpan189-share/internal/bus"
 	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
+	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"github.com/xxcheng123/cloudpan189-share/internal/types"
 	"go.uber.org/zap"
 	"net/http"
@@ -63,7 +65,9 @@ func (s *service) Delete() gin.HandlerFunc {
 			return
 		}
 
-		if err = s.fs.Delete(ctx, fid); err != nil {
+		if err = shared.FileBus.Publish(ctx, bus.TopicFileDeleteFile, bus.TopicFileDeleteRequest{
+			FID: fid,
+		}); err != nil {
 			s.logger.Error("删除文件失败", zap.String("path", rawPath), zap.Int64("fileId", fid), zap.String("fileName", file.Name), zap.Error(err))
 
 			ctx.JSON(http.StatusInternalServerError, types.ErrResponse{

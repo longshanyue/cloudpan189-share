@@ -3,6 +3,7 @@ package universalfs
 import (
 	"context"
 	"fmt"
+	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/enc"
 	"io"
 	"net/http"
 	"net/url"
@@ -92,7 +93,7 @@ func (s *service) FileDownload() gin.HandlerFunc {
 			"sign":      []string{req.Sign},
 		}
 
-		if !verify(values, key) {
+		if !enc.Verify(values, key) {
 			s.logger.Warn("文件下载请求签名验证失败",
 				zap.Int64("fileId", req.ID),
 				zap.String("sign", req.Sign))

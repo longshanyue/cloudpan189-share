@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/xxcheng123/cloudpan189-share/internal/bus"
 
 	"github.com/xxcheng123/cloudpan189-share/configs"
 	"github.com/xxcheng123/cloudpan189-share/internal/jobs"
@@ -13,6 +14,9 @@ func main() {
 	configs.Init()
 
 	defer configs.Logger().Sync()
+
+	bus.Init()
+	defer bus.Close()
 
 	scanJob := jobs.NewScanFileJob(configs.DB(), configs.Logger())
 	if err := scanJob.Start(context.Background()); err != nil {

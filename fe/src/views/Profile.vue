@@ -1,5 +1,5 @@
 <template>
-  <Layout>
+  <div>
     <!-- 个人中心主卡片 -->
     <PageCard title="个人中心" subtitle="管理您的个人信息和账户设置">
       <SectionDivider />
@@ -154,13 +154,12 @@
         </div>
       </div>
     </div>
-  </Layout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import Layout from '@/components/Layout.vue'
 import Icons from '@/components/Icons.vue'
 import PageCard from '@/components/PageCard.vue'
 import SectionDivider from '@/components/SectionDivider.vue'

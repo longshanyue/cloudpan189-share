@@ -20,7 +20,8 @@ export interface Setting {
   multipleStreamChunkSize: number // 多线程流块大小
   strmFileEnable: boolean // STRM文件启用状态
   strmSupportFileExtList: string[] // STRM支持的文件扩展名列表
-  fileWritable: boolean // 文件可写状态
+  linkFileAutoDelete: boolean // 关联文件自动删除
+  strmBaseURL: string // STRM基础URL
 }
 
 export interface InitSystemRequest {
@@ -83,9 +84,14 @@ export interface ModifyStrmSupportFileExtListRequest {
   strmSupportFileExtList: string[] // 可选，不传或空数组表示清空列表
 }
 
-// 新增：切换文件可写状态请求
-export interface ToggleFileWritableRequest {
-  fileWritable: boolean
+// 切换关联文件自动删除请求
+export interface ToggleLinkFileAutoDeleteRequest {
+  linkFileAutoDelete: boolean
+}
+
+// 修改STRM基础URL请求
+export interface ModifyStrmBaseURLRequest {
+  strmBaseURL: string
 }
 
 // 修改操作的通用响应
@@ -165,9 +171,14 @@ export const settingApi = {
     return api.post('/setting/modify_strm_support_file_ext_list', data)
   },
 
-  // 新增：切换文件可写状态
-  toggleFileWritable: (data: ToggleFileWritableRequest): Promise<ModifyResponse> => {
-    return api.post('/setting/toggle_file_writable', data)
+  // 切换关联文件自动删除
+  toggleLinkFileAutoDelete: (data: ToggleLinkFileAutoDeleteRequest): Promise<ModifyResponse> => {
+    return api.post('/setting/toggle_link_file_auto_delete', data)
+  },
+
+  // 修改STRM基础URL
+  modifyStrmBaseURL: (data: ModifyStrmBaseURLRequest): Promise<ModifyResponse> => {
+    return api.post('/setting/modify_strm_base_url', data)
   },
 
   // 初始化系统

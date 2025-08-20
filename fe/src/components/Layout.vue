@@ -39,13 +39,13 @@
             <h3 class="nav-section-title">主要功能</h3>
             <ul class="nav-menu">
               <li class="nav-item">
-                <router-link to="/@dashboard" class="nav-link" :class="{ active: $route.name === 'Dashboard' }">
+                <router-link to="/@admin/dashboard" class="nav-link" :class="{ active: $route.name === 'Dashboard' }">
                   <Icons name="dashboard" class="nav-icon" />
                   <span class="nav-text">仪表盘</span>
                 </router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/@profile" class="nav-link" :class="{ active: $route.name === 'Profile' }">
+                <router-link to="/@admin/profile" class="nav-link" :class="{ active: $route.name === 'Profile' }">
                   <Icons name="user" class="nav-icon" />
                   <span class="nav-text">个人中心</span>
                 </router-link>
@@ -69,31 +69,31 @@
             <h3 class="nav-section-title">管理功能</h3>
             <ul class="nav-menu">
               <li class="nav-item">
-                <router-link to="/@users" class="nav-link" :class="{ active: $route.name === 'Users' }">
+                <router-link to="/@admin/users" class="nav-link" :class="{ active: $route.name === 'Users' }">
                   <Icons name="users" class="nav-icon" />
                   <span class="nav-text">用户管理</span>
                 </router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/@usergroups" class="nav-link" :class="{ active: $route.name === 'UserGroups' }">
+                <router-link to="/@admin/user_groups" class="nav-link" :class="{ active: $route.name === 'UserGroups' }">
                   <Icons name="group" class="nav-icon" />
                   <span class="nav-text">用户组管理</span>
                 </router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/@storage" class="nav-link" :class="{ active: $route.name === 'Storage' }">
+                <router-link to="/@admin/storage" class="nav-link" :class="{ active: $route.name === 'Storage' }">
                   <Icons name="storage" class="nav-icon" />
                   <span class="nav-text">存储管理</span>
                 </router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/@tokens" class="nav-link" :class="{ active: $route.name === 'CloudToken' }">
+                <router-link to="/@admin/cloud_token" class="nav-link" :class="{ active: $route.name === 'CloudToken' }">
                   <Icons name="tokens" class="nav-icon" />
                   <span class="nav-text">令牌管理</span>
                 </router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/@setting" class="nav-link" :class="{ active: $route.name === 'Settings' }">
+                <router-link to="/@admin/setting" class="nav-link" :class="{ active: $route.name === 'Settings' }">
                   <Icons name="settings" class="nav-icon" />
                   <span class="nav-text">系统设置</span>
                 </router-link>
@@ -105,7 +105,7 @@
       
       <!-- 主内容区 -->
       <main class="main-content">
-        <slot />
+        <router-view />
       </main>
     </div>
   </div>
@@ -123,8 +123,9 @@ const settingStore = useSettingStore()
 
 // 退出登录
 const handleLogout = async () => {
-  await authStore.logout()
-  router.push('/@login')
+  authStore.logout()
+
+  await router.push('/@login')
 }
 </script>
 
@@ -253,7 +254,7 @@ const handleLogout = async () => {
 }
 
 .sidebar {
-  width: 250px;
+  width: 12rem;
   background: white;
   border-right: 1px solid #e5e7eb;
   flex-shrink: 0;
@@ -262,6 +263,7 @@ const handleLogout = async () => {
   height: calc(100vh - 73px);
   overflow-y: auto;
   z-index: 10;
+  padding-bottom: 100px;
 }
 
 .sidebar-content {
@@ -327,7 +329,7 @@ const handleLogout = async () => {
 .main-content {
   flex: 1;
   padding: 2rem;
-  margin-left: 250px;
+  margin-left: 12rem;
 }
 
 @media (max-width: 768px) {

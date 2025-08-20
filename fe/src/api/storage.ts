@@ -127,10 +127,6 @@ export interface SearchResponse {
   data: SearchItem[]
 }
 
-export interface ClearRealFileResponse {
-  message: string
-}
-
 export interface ToggleAutoScanRequest {
   id: number
   disableAutoScan: boolean
@@ -180,11 +176,6 @@ export const storageApi = {
   // 搜索文件
   search: (params: SearchRequest): Promise<SearchResponse> => {
     return api.get('/storage/file/search', { params })
-  },
-
-  // 清空本地真实存储
-  clearRealFile: (): Promise<ClearRealFileResponse> => {
-    return api.post('/storage/clear_real_file')
   },
 
   // 切换自动扫描设置

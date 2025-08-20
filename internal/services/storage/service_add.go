@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"github.com/xxcheng123/cloudpan189-share/internal/bus"
+	"github.com/xxcheng123/cloudpan189-share/internal/types"
 	"net/http"
 	"time"
 
@@ -199,7 +201,16 @@ func (s *service) Add() gin.HandlerFunc {
 			return
 		}
 
-		_ = shared.ScanJobPublish(shared.ScanJobTypeRefresh, m)
+		if err = shared.FileBus.Publish(ctx, bus.TopicFileRefreshFile, bus.TopicFileRefreshRequest{
+			FID: m.ID,
+		}); err != nil {
+			ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+				Code:    http.StatusInternalServerError,
+				Message: "创建成功，但是刷新文件失败",
+			})
+		}
+
+		//_ = shared.ScanJobPublish(shared.ScanJobTypeRefresh, m)
 
 		ctx.JSON(http.StatusOK, addResponse{ID: m.ID})
 	}

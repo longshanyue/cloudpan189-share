@@ -6,6 +6,7 @@ session.json
 .idea
 .vscode
 datadir
+media_dir
 
 fe/node_modules
 fe/llm-prompt.txt
