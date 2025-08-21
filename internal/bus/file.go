@@ -323,9 +323,49 @@ func (w *fileBusWorker) walk(ctx context.Context, rootId int64, walkFunc walkFun
 
 	// 判断是否还要继续
 	if nextFiles := walkFunc(ctx, file, children); len(nextFiles) > 0 {
-		for _, nextFile := range nextFiles {
-			if err := w.walk(ctx, nextFile.ID, walkFunc); err != nil {
-				return err
+		// 获取线程数配置
+		threadCount := shared.Setting.JobThreadCount
+		if threadCount <= 0 {
+			threadCount = 1
+		}
+
+		// 如果只有一个线程或者文件数量很少，使用串行处理
+		if threadCount == 1 || len(nextFiles) <= 1 {
+			for _, nextFile := range nextFiles {
+				if err := w.walk(ctx, nextFile.ID, walkFunc); err != nil {
+					return err
+				}
+			}
+		} else {
+			// 使用多线程并发处理
+			var wg sync.WaitGroup
+			errorChan := make(chan error, len(nextFiles))
+			semaphore := make(chan struct{}, threadCount)
+
+			for _, nextFile := range nextFiles {
+				wg.Add(1)
+				go func(file File) {
+					defer wg.Done()
+
+					// 获取信号量
+					semaphore <- struct{}{}
+					defer func() { <-semaphore }()
+
+					if err := w.walk(ctx, file.ID, walkFunc); err != nil {
+						errorChan <- err
+					}
+				}(nextFile)
+			}
+
+			// 等待所有goroutine完成
+			wg.Wait()
+			close(errorChan)
+
+			// 检查是否有错误
+			for err := range errorChan {
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -422,21 +462,67 @@ func (w *fileBusWorker) delete(ctx context.Context, id int64) error {
 			return fmt.Errorf("获取子节点失败: %w", err)
 		}
 
-		var errs []error
-
-		for _, child := range children {
-			if err := w.delete(ctx, child.ID); err != nil {
-				w.logger.Error("删除子文件失败",
-					zap.Int64("parent_id", id),
-					zap.Int64("child_id", child.ID),
-					zap.Error(err))
-
-				errs = append(errs, err)
-			}
+		// 获取线程数配置
+		threadCount := shared.Setting.JobThreadCount
+		if threadCount <= 0 {
+			threadCount = 1
 		}
 
-		if len(errs) > 0 {
-			return errors2.Join(errs...)
+		// 如果只有一个线程或者子文件很少，使用串行处理
+		if threadCount == 1 || len(children) <= 1 {
+			var errs []error
+			for _, child := range children {
+				if err := w.delete(ctx, child.ID); err != nil {
+					w.logger.Error("删除子文件失败",
+						zap.Int64("parent_id", id),
+						zap.Int64("child_id", child.ID),
+						zap.Error(err))
+					errs = append(errs, err)
+				}
+			}
+			if len(errs) > 0 {
+				return errors2.Join(errs...)
+			}
+		} else {
+			// 使用多线程并发删除
+			var wg sync.WaitGroup
+			errorChan := make(chan error, len(children))
+			semaphore := make(chan struct{}, threadCount)
+
+			for _, child := range children {
+				wg.Add(1)
+				go func(childFile File) {
+					defer wg.Done()
+
+					// 获取信号量
+					semaphore <- struct{}{}
+					defer func() { <-semaphore }()
+
+					if err := w.delete(ctx, childFile.ID); err != nil {
+						w.logger.Error("删除子文件失败",
+							zap.Int64("parent_id", id),
+							zap.Int64("child_id", childFile.ID),
+							zap.Error(err))
+						errorChan <- err
+					}
+				}(child)
+			}
+
+			// 等待所有goroutine完成
+			wg.Wait()
+			close(errorChan)
+
+			// 收集所有错误
+			var errs []error
+			for err := range errorChan {
+				if err != nil {
+					errs = append(errs, err)
+				}
+			}
+
+			if len(errs) > 0 {
+				return errors2.Join(errs...)
+			}
 		}
 	}
 
