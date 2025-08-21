@@ -79,13 +79,13 @@ func (w *mediaBusWorker) Register() error {
 	})
 
 	mediaBus.Subscribe(TopicMediaClearAllMedia, func(ctx context.Context, data interface{}) {
-		if _, ok := data.(TopicMediaClearAllMediaRequest); ok {
-			log, _ := newLog(w.db, "清理所有媒体文件")
+		if req, ok := data.(TopicMediaClearAllMediaRequest); ok {
+			log, _ := newLog(w.db, "清理媒体文件")
 
-			if count, err := w.clearAllMedia(ctx); err != nil {
-				w.logger.Error("清理所有媒体文件失败", zap.Error(err))
+			if count, err := w.clearAllMedia(ctx, req.MediaTypes...); err != nil {
+				w.logger.Error("清理媒体文件失败", zap.Error(err))
 
-				_ = log.End(fmt.Sprintf("清理所有媒体文件失败: %s", err.Error()))
+				_ = log.End(fmt.Sprintf("清理媒体文件失败: %s", err.Error()))
 			} else {
 				_ = log.End(fmt.Sprintf("清理完成，删除了 %d 个媒体文件", count))
 			}
@@ -109,20 +109,26 @@ func (w *mediaBusWorker) addStrm(ctx context.Context, fileId int64, path string)
 	hash := utils.MD5([]byte(content))
 
 	file := &models.MediaFile{
-		FID:  fileId,
-		Name: name,
-		Path: path,
-		Hash: hash,
-		Size: int64(len(content)),
+		FID:       fileId,
+		Name:      name,
+		Path:      path,
+		Hash:      hash,
+		Size:      int64(len(content)),
+		MediaType: models.MediaTypeStrm,
 	}
 
 	return w.getDB(ctx).Create(file).Error
 }
 
-func (w *mediaBusWorker) delMedia(ctx context.Context, fileId int64) error {
+func (w *mediaBusWorker) delMedia(ctx context.Context, fileId int64, mediaTypes ...models.MediaType) error {
 	files := make([]*models.MediaFile, 0)
 
-	if err := w.getDB(ctx).Where("fid = ?", fileId).Find(&files).Error; err != nil {
+	query := w.getDB(ctx).Where("fid = ?", fileId)
+	if len(mediaTypes) > 0 {
+		query = query.Where("media_type in ?", mediaTypes)
+	}
+
+	if err := query.Find(&files).Error; err != nil {
 		return err
 	}
 
@@ -236,98 +242,51 @@ func (w *mediaBusWorker) clearEmptyDirsRecursive(dirPath string, deletedCount *i
 	return nil
 }
 
-func (w *mediaBusWorker) clearAllMedia(ctx context.Context) (int, error) {
-	mediaDir := configs.GetConfig().MediaDir
-
-	// 检查媒体目录是否存在
-	if _, err := os.Stat(mediaDir); os.IsNotExist(err) {
-		w.logger.Info("媒体目录不存在，跳过清理", zap.String("media_dir", mediaDir))
-		return 0, nil
-	} else if err != nil {
-		return 0, fmt.Errorf("检查媒体目录失败: %v", err)
-	}
-
-	// 获取所有媒体文件记录
-	var mediaFiles []*models.MediaFile
-	if err := w.getDB(ctx).Find(&mediaFiles).Error; err != nil {
-		return 0, fmt.Errorf("获取媒体文件记录失败: %v", err)
-	}
-
-	deletedCount := 0
-	var errs []error
-
-	// 删除数据库中的所有媒体文件记录
-	if len(mediaFiles) > 0 {
-		if err := w.getDB(ctx).Delete(&mediaFiles).Error; err != nil {
-			errs = append(errs, fmt.Errorf("删除数据库记录失败: %v", err))
+func (w *mediaBusWorker) clearAllMedia(ctx context.Context, mediaTypes ...models.MediaType) (count int64, err error) {
+	defer func() {
+		if err != nil {
+			w.logger.Error("清理所有媒体文件失败", zap.Error(err))
 		} else {
-			w.logger.Info("删除数据库中的媒体文件记录", zap.Int("count", len(mediaFiles)))
+			w.logger.Info("清理所有媒体文件成功", zap.Int64("count", count))
+
+			// 清理所有空目录
+			_, _ = w.clearEmptyDirs(ctx)
+		}
+	}()
+
+	buildQuery := func() *gorm.DB {
+		query := w.getDB(ctx).Limit(1000)
+
+		if len(mediaTypes) > 0 {
+			query = query.Where("media_type in ?", mediaTypes)
+		}
+
+		return query
+	}
+
+	for {
+		files := make([]*models.MediaFile, 0)
+		if err = buildQuery().Find(&files).Error; err != nil {
+			return count, err
+		}
+
+		if len(files) == 0 {
+			return count, nil
+		}
+
+		for _, file := range files {
+			_ = os.Remove(configs.GetConfig().MediaJoinPath(file.Path))
+		}
+
+		fileIds := make([]int64, 0)
+		for _, file := range files {
+			fileIds = append(fileIds, file.ID)
+		}
+
+		if err = w.getDB(ctx).Where("id IN (?)", fileIds).Delete(new(models.MediaFile)).Error; err != nil {
+			return count, err
 		}
 	}
-
-	// 强制递归删除整个媒体目录
-	if err := w.clearAllMediaRecursive(mediaDir, &deletedCount); err != nil {
-		errs = append(errs, err)
-	}
-
-	// 重新创建媒体目录
-	if err := os.MkdirAll(mediaDir, 0755); err != nil {
-		errs = append(errs, fmt.Errorf("重新创建媒体目录失败: %v", err))
-	}
-
-	w.logger.Info("清理所有媒体文件完成",
-		zap.String("media_dir", mediaDir),
-		zap.Int("deleted_files", deletedCount),
-		zap.Int("deleted_db_records", len(mediaFiles)),
-	)
-
-	if len(errs) > 0 {
-		return deletedCount, errors.Join(errs...)
-	}
-
-	return deletedCount, nil
-}
-
-func (w *mediaBusWorker) clearAllMediaRecursive(dirPath string, deletedCount *int) error {
-	entries, err := os.ReadDir(dirPath)
-	if err != nil {
-		return fmt.Errorf("读取目录失败 %s: %v", dirPath, err)
-	}
-
-	// 递归处理所有子项
-	for _, entry := range entries {
-		fullPath := filepath.Join(dirPath, entry.Name())
-		
-		if entry.IsDir() {
-			// 递归处理子目录
-			if err := w.clearAllMediaRecursive(fullPath, deletedCount); err != nil {
-				w.logger.Warn("清理子目录失败",
-					zap.String("dir", fullPath),
-					zap.Error(err))
-			}
-			
-			// 删除空目录
-			if err := os.Remove(fullPath); err != nil {
-				w.logger.Warn("删除目录失败",
-					zap.String("dir", fullPath),
-					zap.Error(err))
-			} else {
-				w.logger.Debug("删除目录", zap.String("dir", fullPath))
-			}
-		} else {
-			// 删除文件
-			if err := os.Remove(fullPath); err != nil {
-				w.logger.Warn("删除文件失败",
-					zap.String("file", fullPath),
-					zap.Error(err))
-			} else {
-				w.logger.Debug("删除文件", zap.String("file", fullPath))
-				*deletedCount++
-			}
-		}
-	}
-
-	return nil
 }
 
 func (w *mediaBusWorker) getDB(ctx context.Context) *gorm.DB {

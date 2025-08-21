@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"github.com/xxcheng123/cloudpan189-share/internal/services/advancedops"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -35,6 +36,7 @@ func StartHTTPServer() error {
 		storageService     = storage.NewService(db, logger)
 		universalFsService = universalfs.NewService(db, logger)
 		userGroupService   = usergroup.NewService(db, logger)
+		advancedOpsService = advancedops.NewService(db, logger)
 	)
 
 	openapiRouter := engine.Group("/api")
@@ -108,6 +110,12 @@ func StartHTTPServer() error {
 
 		openapiRouter.POST("/storage/deep_refresh_file", userService.AuthMiddleware(models.PermissionBase), storageService.DeepRefreshFile())
 		openapiRouter.GET("/storage/file/search", userService.AuthMiddleware(models.PermissionBase), storageService.Search())
+	}
+
+	advancedOpsRouter := openapiRouter.Group("/advanced_ops", userService.AuthMiddleware(models.PermissionAdmin))
+	{
+		advancedOpsRouter.POST("/rebuild_strm", advancedOpsService.RebuildStrm())
+		advancedOpsRouter.POST("/clear_media", advancedOpsService.ClearMedia())
 	}
 
 	{

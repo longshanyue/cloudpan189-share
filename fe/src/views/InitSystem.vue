@@ -198,7 +198,7 @@ const handleSubmit = async () => {
     
     // 初始化成功，直接跳转到登录页面
     // 由于已经更新了系统状态，路由守卫会允许访问登录页面
-    await router.push('/@login')
+    router.push('/@login')
   } catch (error: any) {
     console.error('初始化失败:', error)
     toast.error(error.response?.data?.msg || '初始化失败，请重试')

@@ -349,7 +349,6 @@
         </div>
       </div>
 
-
       <!-- 关联文件自动删除设置 -->
       <div class="setting-item">
         <div class="setting-label">
@@ -366,6 +365,22 @@
             >
             <span class="switch-slider"></span>
           </div>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="label-text">清理媒体文件</span>
+          <span class="label-desc">清理系统中的所有媒体文件数据，此操作不可逆</span>
+        </div>
+        <div class="setting-control">
+          <button
+              @click="handleClearMedia"
+              class="btn btn-danger btn-sm"
+              :disabled="loading"
+          >
+            {{ loading ? '清理中...' : '清理媒体文件' }}
+          </button>
         </div>
       </div>
 
@@ -459,6 +474,7 @@ import SectionDivider from '@/components/SectionDivider.vue'
 import SubsectionTitle from '@/components/SubsectionTitle.vue'
 import { toast } from '@/utils/toast'
 import { confirmDialog } from '@/utils/confirm'
+import { advancedOpsApi } from '@/api/advancedops'
 
 const settingStore = useSettingStore()
 
@@ -913,9 +929,8 @@ const handleRebuildStrmFiles = async () => {
 
   try {
     loading.value = true
-    // 传入true表示重建
-    await settingStore.toggleStrmFileEnable(true)
-    toast.success('STRM文件重建已开始')
+    await advancedOpsApi.rebuildStrm()
+    toast.success('STRM文件重建成功')
   } catch (error) {
     console.error('重建STRM文件失败:', error)
     toast.error('重建STRM文件失败')
@@ -1051,6 +1066,32 @@ const handleToggleLinkFileAutoDelete = async () => {
   }
 }
 
+// 清理媒体文件
+const handleClearMedia = async () => {
+  const confirmed = await confirmDialog({
+    title: '清理媒体文件',
+    message: '确定要清理所有媒体文件数据吗？此操作将删除所有媒体文件记录，不可逆转。',
+    confirmText: '确认',
+    cancelText: '取消',
+    isDanger: true
+  })
+
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    loading.value = true
+    await advancedOpsApi.clearMedia()
+    toast.success('媒体文件清理成功')
+  } catch (error) {
+    console.error('清理媒体文件失败:', error)
+    toast.error('清理媒体文件失败')
+  } finally {
+    loading.value = false
+  }
+}
+
 // 组件挂载时获取设置并启动定时器
 onMounted(async () => {
   // 初始获取数据
@@ -1072,7 +1113,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 原有样式保持不变... */
 /* 设置项样式 */
 .setting-item {
   display: flex;
@@ -1566,7 +1606,6 @@ onUnmounted(() => {
   .modal-content {
     max-height: calc(100vh - 1rem);
   }
-
   .modal-header,
   .modal-body,
   .modal-footer {
@@ -1587,5 +1626,151 @@ onUnmounted(() => {
     width: 100%;
     justify-content: flex-start;
   }
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: 1rem;
+  }
+  .ext-input-group {
+    flex-direction: column;
+  }
+
+  .ext-list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .ext-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .setting-input {
+    min-width: auto;
+    flex: 1;
+    width: 100%;
+  }
+
+  .thread-count-control {
+    min-width: auto;
+    width: 100%;
+  }
+
+  .strm-ext-display {
+    min-width: auto;
+    width: 100%;
+  }
+
+  .modal-overlay {
+    padding: 0.5rem;
+  }
+
+  .modal-content {
+    max-height: calc(100vh - 1rem);
+  }
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: 1rem;
+  }
+
+  .ext-input-group {
+    flex-direction: column;
+  }
+
+  .ext-list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .ext-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: 1rem;
+  }
+  .ext-input-group {
+    flex-direction: column;
+  }
+
+  .ext-list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .ext-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .setting-input {
+    min-width: auto;
+    flex: 1;
+    width: 100%;
+  }
+
+  .thread-count-control {
+    min-width: auto;
+    width: 100%;
+  }
+
+  .strm-ext-display {
+    min-width: auto;
+    width: 100%;
+  }
+
+  .modal-overlay {
+    padding: 0.5rem;
+  }
+
+  .modal-content {
+    max-height: calc(100vh - 1rem);
+  }
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: 1rem;
+  }
+
+  .ext-input-group {
+    flex-direction: column;
+  }
+
+  .ext-list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .ext-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: 1rem;
+  }
+  .ext-input-group {
+    flex-direction: column;
+  }
+
+  .ext-list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .ext-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 </style>
+

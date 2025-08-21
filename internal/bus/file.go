@@ -91,17 +91,22 @@ func (w *fileBusWorker) Register() error {
 	})
 
 	fileBus.Subscribe(TopicFileRebuildMediaFile, func(ctx context.Context, data interface{}) {
-		if _, ok := data.(TopicFileRebuildMediaFileRequest); ok {
-			log, _ := newLog(w.db, "（重建）所有媒体文件")
+		if req, ok := data.(TopicFileRebuildMediaFileRequest); ok {
+			log, _ := newLog(w.db, "（重建）媒体文件")
 
-			if err := shared.MediaBus.PublishSync(ctx, TopicMediaClearAllMedia, TopicMediaClearAllMediaRequest{}); err != nil {
-				w.logger.Error("（重建）所有媒体文件", zap.Error(err))
+			mediaReq := TopicMediaClearAllMediaRequest{}
+			if len(req.MediaTypes) > 0 {
+				mediaReq.MediaTypes = req.MediaTypes
+			}
 
-				_ = log.End(fmt.Sprintf("删除所有媒体文件执行失败: %s", err.Error()))
+			if err := shared.MediaBus.PublishSync(ctx, TopicMediaClearAllMedia, mediaReq); err != nil {
+				w.logger.Error("（重建）媒体文件", zap.Error(err))
+
+				_ = log.End(fmt.Sprintf("删除媒体文件执行失败: %s", err.Error()))
 			}
 
 			if count, err := w.buildMediaFile(ctx, 0); err != nil {
-				w.logger.Error("（重建）所有媒体文件", zap.Error(err))
+				w.logger.Error("（重建）媒体文件", zap.Error(err))
 
 				_ = log.End(fmt.Sprintf("执行失败: %s", err.Error()))
 			} else {

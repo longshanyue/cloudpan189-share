@@ -1,5 +1,7 @@
 package bus
 
+import "github.com/xxcheng123/cloudpan189-share/internal/models"
+
 const (
 	TopicFileRefreshFile      = "file::refresh::file"
 	TopicFileDeleteFile       = "file::delete::file"
@@ -16,7 +18,9 @@ type TopicFileDeleteRequest struct {
 	FID int64 `json:"fid"`
 }
 
-type TopicFileRebuildMediaFileRequest struct{}
+type TopicFileRebuildMediaFileRequest struct {
+	MediaTypes []models.MediaType
+}
 
 const (
 	TopicMediaAddStrmFile    = "media::add::strm::file"
@@ -38,4 +42,5 @@ type TopicMediaClearEmptyDirRequest struct {
 }
 
 type TopicMediaClearAllMediaRequest struct {
+	MediaTypes []models.MediaType
 }
