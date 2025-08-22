@@ -5,10 +5,10 @@ package shared
 import "github.com/xxcheng123/cloudpan189-share/internal/models"
 
 var (
-	MultipleStreamThreadCount int = models.DefaultMultipleStreamThreadCount
-	MultipleStreamChunkSize int64 = models.DefaultMultipleStreamChunkSize
-	StrmFileEnable bool = models.DefaultStrmFileEnable
-	StrmSupportFileExtList []string = models.DefaultStrmSupportFileExtList
-	LinkFileAutoDelete bool = models.DefaultLinkFileAutoDelete
-	StrmBaseURL string = models.DefaultStrmBaseURL
+	MultipleStreamThreadCount int      = models.DefaultMultipleStreamThreadCount
+	MultipleStreamChunkSize   int64    = models.DefaultMultipleStreamChunkSize
+	StrmFileEnable            bool     = models.DefaultStrmFileEnable
+	StrmSupportFileExtList    []string = models.DefaultStrmSupportFileExtList
+	LinkFileAutoDelete        bool     = models.DefaultLinkFileAutoDelete
+	StrmBaseURL               string   = models.DefaultStrmBaseURL
 )

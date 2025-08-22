@@ -2,12 +2,12 @@ package storage
 
 import (
 	"errors"
-	"github.com/xxcheng123/cloudpan189-share/internal/bus"
 	"net/http"
+
+	"github.com/xxcheng123/cloudpan189-share/internal/bus"
 
 	"github.com/gin-gonic/gin"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
-	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"gorm.io/gorm"
 )
 
@@ -92,9 +92,7 @@ func (s *service) Delete() gin.HandlerFunc {
 
 		file = scanFile
 
-		if err := shared.FileBus.Publish(ctx, bus.TopicFileDeleteFile, bus.TopicFileDeleteRequest{
-			FID: file.ID,
-		}); err != nil {
+		if err := bus.PublishVirtualFileDelete(ctx, file.ID); err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{
 				"code": http.StatusInternalServerError,
 				"msg":  err.Error(),

@@ -121,7 +121,7 @@ func Init() {
 			logger2.WithInfoLevel(),
 			logger2.WithDebugLevel(),
 			logger2.WithOutputInConsole(),
-			logger2.WithField("build_info", fmt.Sprintf("[buildDate:%s]&&[commit:%s]&&[gitSummary:%s]&&[gitBranch:%s]", BuildDate, Commit, GitSummary, GitBranch)),
+			// logger2.WithField("build_info", fmt.Sprintf("[buildDate:%s]&&[commit:%s]&&[gitSummary:%s]&&[gitBranch:%s]", BuildDate, Commit, GitSummary, GitBranch)),
 		}
 
 		logger, err = logger2.NewJSONLogger(options...)

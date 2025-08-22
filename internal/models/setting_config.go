@@ -29,8 +29,8 @@ var SettingItems = []SettingItem{
 		MethodSuffix: "StrmFileEnable",
 	},
 	{
-		Key:          "strm_support_file_ext_list",
-		Type:         "json",
+		Key:  "strm_support_file_ext_list",
+		Type: "json",
 		DefaultValue: []string{
 			"mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "m4v",
 			"mpg", "mpeg", "m2v", "m4p", "m4b", "ts", "mts", "m2ts", "m2t",

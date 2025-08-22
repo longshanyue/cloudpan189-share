@@ -45,21 +45,21 @@ func (w *worker) getStatus() WorkerStatus {
 func (w *worker) getInfo() WorkerInfo {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	
+
 	info := WorkerInfo{
-		ID:              w.id,
-		Status:          w.getStatus(),
-		CurrentTopic:    w.currentTopic,
-		TotalProcessed:  atomic.LoadInt64(&w.totalProcessed),
+		ID:             w.id,
+		Status:         w.getStatus(),
+		CurrentTopic:   w.currentTopic,
+		TotalProcessed: atomic.LoadInt64(&w.totalProcessed),
 	}
-	
+
 	if w.processingStart != nil {
 		info.ProcessingStart = w.processingStart
 	}
 	if w.lastProcessedAt != nil {
 		info.LastProcessedAt = w.lastProcessedAt
 	}
-	
+
 	return info
 }
 
@@ -128,13 +128,13 @@ func (w *worker) handleMessage(msg Message) {
 	w.setCurrentTopic(msg.Topic)
 	now := time.Now()
 	w.setProcessingStart(&now)
-	
+
 	// 确保在函数结束时发送完成通知（如果需要）和清理状态
 	defer func() {
 		w.incrementProcessed()
 		w.setCurrentTopic("")
 		w.setProcessingStart(nil)
-		
+
 		if msg.Done != nil {
 			close(msg.Done)
 		}

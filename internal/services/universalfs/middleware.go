@@ -1,6 +1,8 @@
 package universalfs
 
 import (
+	"net/http"
+
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -10,7 +12,6 @@ import (
 	"github.com/xxcheng123/cloudpan189-share/internal/types"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"net/http"
 )
 
 func (s *service) BaseMiddleware() gin.HandlerFunc {

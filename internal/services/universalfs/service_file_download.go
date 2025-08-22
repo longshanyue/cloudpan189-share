@@ -3,7 +3,6 @@ package universalfs
 import (
 	"context"
 	"fmt"
-	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/enc"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/enc"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"

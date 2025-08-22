@@ -1,10 +1,11 @@
 package storage
 
 import (
-	"github.com/xxcheng123/cloudpan189-share/internal/bus"
-	"github.com/xxcheng123/cloudpan189-share/internal/types"
 	"net/http"
 	"time"
+
+	"github.com/xxcheng123/cloudpan189-share/internal/bus"
+	"github.com/xxcheng123/cloudpan189-share/internal/types"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -12,7 +13,6 @@ import (
 	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
-	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"gorm.io/datatypes"
 )
 
@@ -201,9 +201,7 @@ func (s *service) Add() gin.HandlerFunc {
 			return
 		}
 
-		if err = shared.FileBus.Publish(ctx, bus.TopicFileRefreshFile, bus.TopicFileRefreshRequest{
-			FID: m.ID,
-		}); err != nil {
+		if err = bus.PublishVirtualFileRefresh(ctx, pid, false); err != nil {
 			ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
 				Code:    http.StatusInternalServerError,
 				Message: "创建成功，但是刷新文件失败",

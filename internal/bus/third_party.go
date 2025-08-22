@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
+
 	"github.com/xxcheng123/cloudpan189-interface/client"
 	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
-	"strings"
-	"sync"
 )
 
-func (w *fileBusWorker) getSubscribeUserFiles(ctx context.Context, f File) ([]File, error) {
+func (w *busWorker) getSubscribeUserFiles(ctx context.Context, f *models.VirtualFile) ([]*models.VirtualFile, error) {
 	_userId, ok := f.Addition[consts.FileAdditionKeySubscribeUser]
 	if !ok {
 		return nil, errors.New("no subscribe_user")
@@ -23,7 +24,7 @@ func (w *fileBusWorker) getSubscribeUserFiles(ctx context.Context, f File) ([]Fi
 	var (
 		pageNum  int64 = 1
 		pageSize int64 = 200
-		files          = make([]File, 0)
+		files          = make([]*models.VirtualFile, 0)
 	)
 
 	resp, err := w.client.GetUpResourceShare(ctx, userId, pageNum, pageSize)
@@ -58,11 +59,11 @@ func (w *fileBusWorker) getSubscribeUserFiles(ctx context.Context, f File) ([]Fi
 			mu       sync.Mutex
 			wg       sync.WaitGroup
 			errs     []error
-			allFiles [][]File
+			allFiles [][]*models.VirtualFile
 		)
 
 		totalPages := (resp.Data.Count + pageSize - 1) / pageSize
-		allFiles = make([][]File, totalPages-1)
+		allFiles = make([][]*models.VirtualFile, totalPages-1)
 
 		for i := int64(2); i <= totalPages; i++ {
 			wg.Add(1)
@@ -78,7 +79,7 @@ func (w *fileBusWorker) getSubscribeUserFiles(ctx context.Context, f File) ([]Fi
 				}
 
 				if subResp.Data != nil {
-					var pageFiles []File
+					var pageFiles []*models.VirtualFile
 					for _, v := range subResp.Data.FileList {
 						pageFiles = append(pageFiles, &models.VirtualFile{
 							ParentId:   f.ID,
@@ -117,7 +118,7 @@ func (w *fileBusWorker) getSubscribeUserFiles(ctx context.Context, f File) ([]Fi
 	return files, nil
 }
 
-func (w *fileBusWorker) getSubscribeShareFiles(ctx context.Context, f File) ([]File, error) {
+func (w *busWorker) getSubscribeShareFiles(ctx context.Context, f *models.VirtualFile) ([]*models.VirtualFile, error) {
 	_userId, ok := f.Addition[consts.FileAdditionKeySubscribeUser]
 	if !ok {
 		return nil, errors.New("no subscribe_user")
@@ -139,7 +140,7 @@ func (w *fileBusWorker) getSubscribeShareFiles(ctx context.Context, f File) ([]F
 		fileId     = utils.String(_fileId)
 		pageNum    = 1
 		pageSize   = 200
-		files      = make([]File, 0)
+		files      = make([]*models.VirtualFile, 0)
 	)
 
 	resp, err := w.client.ListShareDir(ctx, shareId, client.String(fileId), func(req *client.ListShareFileRequest) {
@@ -196,11 +197,11 @@ func (w *fileBusWorker) getSubscribeShareFiles(ctx context.Context, f File) ([]F
 			mu       sync.Mutex
 			wg       sync.WaitGroup
 			errs     []error
-			allFiles [][]File
+			allFiles [][]*models.VirtualFile
 		)
 
 		totalPages := (resp.FileListAO.Count + int64(pageSize) - 1) / int64(pageSize)
-		allFiles = make([][]File, totalPages-1)
+		allFiles = make([][]*models.VirtualFile, totalPages-1)
 
 		for i := int64(2); i <= totalPages; i++ {
 			wg.Add(1)
@@ -218,7 +219,7 @@ func (w *fileBusWorker) getSubscribeShareFiles(ctx context.Context, f File) ([]F
 					return
 				}
 
-				var pageFiles []File
+				var pageFiles []*models.VirtualFile
 				for _, v := range subResp.FileListAO.FolderList {
 					pageFiles = append(pageFiles, &models.VirtualFile{
 						ParentId:   f.ID,
@@ -276,7 +277,7 @@ func (w *fileBusWorker) getSubscribeShareFiles(ctx context.Context, f File) ([]F
 	return files, nil
 }
 
-func (w *fileBusWorker) getShareFiles(ctx context.Context, f File) ([]File, error) {
+func (w *busWorker) getShareFiles(ctx context.Context, f *models.VirtualFile) ([]*models.VirtualFile, error) {
 	var vv, ok = f.Addition[consts.FileAdditionKeyShareId]
 	if !ok {
 		return nil, errors.New("no share_id")
@@ -313,7 +314,7 @@ func (w *fileBusWorker) getShareFiles(ctx context.Context, f File) ([]File, erro
 	var (
 		pageNum  = 1
 		pageSize = 200
-		files    = make([]File, 0)
+		files    = make([]*models.VirtualFile, 0)
 		addMpFn  = func(mp map[string]any) map[string]any {
 			mp[consts.FileAdditionKeyShareId] = shareId
 			mp[consts.FileAdditionKeyShareMode] = shareMode
@@ -378,11 +379,11 @@ func (w *fileBusWorker) getShareFiles(ctx context.Context, f File) ([]File, erro
 			mu       sync.Mutex
 			wg       sync.WaitGroup
 			errs     []error
-			allFiles [][]File
+			allFiles [][]*models.VirtualFile
 		)
 
 		totalPages := (resp.FileListAO.Count + int64(pageSize) - 1) / int64(pageSize)
-		allFiles = make([][]File, totalPages-1)
+		allFiles = make([][]*models.VirtualFile, totalPages-1)
 
 		for i := int64(2); i <= totalPages; i++ {
 			wg.Add(1)
@@ -400,7 +401,7 @@ func (w *fileBusWorker) getShareFiles(ctx context.Context, f File) ([]File, erro
 					return
 				}
 
-				var pageFiles []File
+				var pageFiles []*models.VirtualFile
 				for _, v := range subResp.FileListAO.FolderList {
 					pageFiles = append(pageFiles, &models.VirtualFile{
 						ParentId:   f.ID,

@@ -321,7 +321,7 @@ func toCamelCase(s string) string {
 	if len(s) == 0 {
 		return s
 	}
-	
+
 	// 将第一个字符转换为小写
 	runes := []rune(s)
 	runes[0] = runes[0] + 32 // 转换为小写

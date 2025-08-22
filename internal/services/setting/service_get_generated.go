@@ -13,26 +13,26 @@ import (
 
 type getResponse struct {
 	*models.Setting
-	RunTimes int64 `json:"runTimes"` // 已经运行的时间
-	MultipleStreamThreadCount int `json:"multipleStreamThreadCount"`
-	MultipleStreamChunkSize int64 `json:"multipleStreamChunkSize"`
-	StrmFileEnable bool `json:"strmFileEnable"`
-	StrmSupportFileExtList []string `json:"strmSupportFileExtList"`
-	LinkFileAutoDelete bool `json:"linkFileAutoDelete"`
-	StrmBaseURL string `json:"strmBaseURL"`
+	RunTimes                  int64    `json:"runTimes"` // 已经运行的时间
+	MultipleStreamThreadCount int      `json:"multipleStreamThreadCount"`
+	MultipleStreamChunkSize   int64    `json:"multipleStreamChunkSize"`
+	StrmFileEnable            bool     `json:"strmFileEnable"`
+	StrmSupportFileExtList    []string `json:"strmSupportFileExtList"`
+	LinkFileAutoDelete        bool     `json:"linkFileAutoDelete"`
+	StrmBaseURL               string   `json:"strmBaseURL"`
 }
 
 func (s *service) Get() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, &getResponse{
-			Setting:  shared.Setting,
-			RunTimes: time.Now().Unix() - s.starTime.Unix(),
+			Setting:                   shared.Setting,
+			RunTimes:                  time.Now().Unix() - s.starTime.Unix(),
 			MultipleStreamThreadCount: shared.MultipleStreamThreadCount,
-			MultipleStreamChunkSize: shared.MultipleStreamChunkSize,
-			StrmFileEnable: shared.StrmFileEnable,
-			StrmSupportFileExtList: shared.StrmSupportFileExtList,
-			LinkFileAutoDelete: shared.LinkFileAutoDelete,
-			StrmBaseURL: shared.StrmBaseURL,
+			MultipleStreamChunkSize:   shared.MultipleStreamChunkSize,
+			StrmFileEnable:            shared.StrmFileEnable,
+			StrmSupportFileExtList:    shared.StrmSupportFileExtList,
+			LinkFileAutoDelete:        shared.LinkFileAutoDelete,
+			StrmBaseURL:               shared.StrmBaseURL,
 		})
 	}
 }

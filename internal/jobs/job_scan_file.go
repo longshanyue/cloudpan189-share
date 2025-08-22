@@ -2,10 +2,11 @@ package jobs
 
 import (
 	"context"
-	"github.com/xxcheng123/cloudpan189-share/internal/bus"
 	"runtime/debug"
 	"sync"
 	"time"
+
+	"github.com/xxcheng123/cloudpan189-share/internal/bus"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/xxcheng123/cloudpan189-interface/client"
@@ -84,15 +85,15 @@ func (s *ScanFileJob) doJob(ctx context.Context) bool {
 		}
 
 		//case <-time.After(time.Second * 5):
-		stats := shared.FileBus.GetRuntimeStats()
-		if (stats.QueueLength + stats.ProcessingWorkers) > 0 {
-			s.logger.Info("正在待处理或者处理中的任务，跳过本次定时扫描")
-
-			return true
-		}
+		//stats := shared.FileBus.GetRuntimeStats()
+		//if (stats.QueueLength + stats.ProcessingWorkers) > 0 {
+		//	s.logger.Info("正在待处理或者处理中的任务，跳过本次定时扫描")
+		//
+		//	return true
+		//}
 
 		s.logger.Info("scan top file job started")
-		if err := shared.FileBus.Publish(context.Background(), bus.TopicFileScanTop, nil); err != nil {
+		if err := bus.PublishVirtualFileScanTop(ctx); err != nil {
 			s.logger.Error("failed to publish scan top job", zap.Error(err))
 		}
 	}

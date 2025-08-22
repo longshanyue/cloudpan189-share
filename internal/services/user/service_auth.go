@@ -2,9 +2,10 @@ package user
 
 import (
 	"errors"
-	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"net/http"
 	"strings"
+
+	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 
 	"github.com/gin-gonic/gin"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"

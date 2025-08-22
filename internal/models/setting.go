@@ -81,7 +81,6 @@ func (s *SettingDict) TableName() string {
 	return "setting_dicts"
 }
 
-
 func (s *SettingDict) query(db *gorm.DB, key string) (string, error) {
 	var m = new(SettingDict)
 
@@ -109,4 +108,3 @@ func (s *SettingDict) store(db *gorm.DB, key, value string, typ string) *gorm.DB
 		Type:  typ,
 	})
 }
-

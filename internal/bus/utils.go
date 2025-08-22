@@ -2,10 +2,11 @@ package bus
 
 import (
 	"fmt"
+	"net/url"
+
 	"github.com/google/uuid"
 	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/enc"
 	"github.com/xxcheng123/cloudpan189-share/internal/shared"
-	"net/url"
 )
 
 func generateDownloadURLWithNeverExpire(fid int64) string {

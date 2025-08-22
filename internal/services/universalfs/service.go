@@ -1,8 +1,9 @@
 package universalfs
 
 import (
-	"golang.org/x/net/webdav"
 	"time"
+
+	"golang.org/x/net/webdav"
 
 	"github.com/gin-gonic/gin"
 	"github.com/patrickmn/go-cache"

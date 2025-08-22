@@ -4,130 +4,32 @@ import (
 	"context"
 	errors2 "errors"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/samber/lo"
-	"github.com/xxcheng123/cloudpan189-interface/client"
-	"github.com/xxcheng123/cloudpan189-share/internal/consts"
-	"github.com/xxcheng123/cloudpan189-share/internal/models"
-	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/messagebus"
-	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
-	"github.com/xxcheng123/cloudpan189-share/internal/shared"
-	"go.uber.org/zap"
-	"gorm.io/gorm"
 	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/samber/lo"
+	"github.com/xxcheng123/cloudpan189-share/internal/consts"
+	"github.com/xxcheng123/cloudpan189-share/internal/models"
+	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
+	"github.com/xxcheng123/cloudpan189-share/internal/shared"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
-type fileBusWorker struct {
-	db     *gorm.DB
-	logger *zap.Logger
-	client client.Client
+type virtualFileWalkFunc func(ctx context.Context, file *models.VirtualFile, childrenFiles []*models.VirtualFile) (nextWalkFiles []*models.VirtualFile)
 
-	lock sync.Mutex
-}
-
-var (
-	fileBusWorkerInstance *fileBusWorker
-
-	allowAutoDelOsTypes = []string{
-		models.OsTypeFolder,
-		models.OsTypeFile,
-		models.OsTypeSubscribe,
-		models.OsTypeSubscribeShare,
-		models.OsTypeShare,
-	}
-)
-
-func (w *fileBusWorker) Register() error {
-	if !w.lock.TryLock() {
-		return ErrBusRegistered
-	}
-
-	fileBus := messagebus.New(messagebus.DefaultConfig(), w.logger.With(zap.String("bus", "file_bus")))
-
-	fileBus.Subscribe(TopicFileRefreshFile, func(ctx context.Context, data interface{}) {
-		if req, ok := data.(TopicFileRefreshRequest); ok {
-			log, _ := newLog(w.db, fmt.Sprintf("扫描顶层文件ID:%d及子文件", req.FID))
-
-			if err := w.scanFile(ctx, req.FID, req.Deep); err != nil {
-				w.logger.Error("扫描文件失败", zap.Error(err))
-
-				_ = log.End(fmt.Sprintf("扫描文件失败: %s", err.Error()))
-			} else {
-				_ = log.End("扫描成功")
-			}
-		}
-	})
-
-	fileBus.Subscribe(TopicFileDeleteFile, func(ctx context.Context, data interface{}) {
-		if req, ok := data.(TopicFileDeleteRequest); ok {
-			log, _ := newLog(w.db, fmt.Sprintf("删除文件ID:%d", req.FID))
-
-			if err := w.delete(ctx, req.FID); err != nil {
-				w.logger.Error("删除文件失败", zap.Error(err))
-
-				_ = log.End(fmt.Sprintf("删除文件失败: %s", err.Error()))
-			} else {
-				_ = log.End("删除成功")
-			}
-		}
-	})
-
-	fileBus.Subscribe(TopicFileScanTop, func(ctx context.Context, data interface{}) {
-		log, _ := newLog(w.db, "扫描所有文件")
-
-		err := w.scanTop(ctx)
-		if err != nil {
-			w.logger.Error("扫描所有文件失败", zap.Error(err))
-
-			_ = log.End(fmt.Sprintf("扫描所有文件失败: %s", err.Error()))
-		} else {
-			_ = log.End("扫描成功")
-		}
-	})
-
-	fileBus.Subscribe(TopicFileRebuildMediaFile, func(ctx context.Context, data interface{}) {
-		if req, ok := data.(TopicFileRebuildMediaFileRequest); ok {
-			log, _ := newLog(w.db, "（重建）媒体文件")
-
-			mediaReq := TopicMediaClearAllMediaRequest{}
-			if len(req.MediaTypes) > 0 {
-				mediaReq.MediaTypes = req.MediaTypes
-			}
-
-			if err := shared.MediaBus.PublishSync(ctx, TopicMediaClearAllMedia, mediaReq); err != nil {
-				w.logger.Error("（重建）媒体文件", zap.Error(err))
-
-				_ = log.End(fmt.Sprintf("删除媒体文件执行失败: %s", err.Error()))
-			}
-
-			if count, err := w.buildMediaFile(ctx, 0); err != nil {
-				w.logger.Error("（重建）媒体文件", zap.Error(err))
-
-				_ = log.End(fmt.Sprintf("执行失败: %s", err.Error()))
-			} else {
-				_ = log.End(fmt.Sprintf("重建完成，处理了 %d 个文件", count))
-			}
-		}
-	})
-
-	shared.FileBus = fileBus
-
-	return nil
-}
-
-type File = *models.VirtualFile
-
-type walkFunc func(ctx context.Context, file File, childrenFiles []File) (nextWalkFiles []File)
-
-func (w *fileBusWorker) scanFile(ctx context.Context, rootId int64, deep bool) error {
-	return w.walk(ctx, rootId, func(ctx context.Context, file File, oldFiles []File) (nextWalkFiles []File) {
+func (w *busWorker) scanVirtualFile(ctx context.Context, rootId int64, deep bool) error {
+	var scanErrors []error
+	var mu sync.Mutex
+	
+	err := w.walkVirtualFile(ctx, rootId, func(ctx context.Context, file *models.VirtualFile, oldFiles []*models.VirtualFile) (nextWalkFiles []*models.VirtualFile) {
 		var (
-			newFiles = make([]File, 0)
+			newFiles = make([]*models.VirtualFile, 0)
 			err      error
 		)
 
@@ -144,7 +46,9 @@ func (w *fileBusWorker) scanFile(ctx context.Context, rootId int64, deep bool) e
 
 		if err != nil {
 			w.logger.Error("获取文件列表失败", zap.Error(err))
-
+			mu.Lock()
+			scanErrors = append(scanErrors, fmt.Errorf("获取文件列表失败 [%s]: %w", file.Name, err))
+			mu.Unlock()
 			return nil
 		}
 
@@ -152,8 +56,8 @@ func (w *fileBusWorker) scanFile(ctx context.Context, rootId int64, deep bool) e
 
 		// 创建映射表，用于快速查找
 		var (
-			newFileMap = make(map[string]File)
-			oldFileMap = make(map[string]File)
+			newFileMap = make(map[string]*models.VirtualFile)
+			oldFileMap = make(map[string]*models.VirtualFile)
 		)
 
 		for _, item := range newFiles {
@@ -168,13 +72,13 @@ func (w *fileBusWorker) scanFile(ctx context.Context, rootId int64, deep bool) e
 
 		var (
 			// 新增的文件
-			filesToCreate []File
+			filesToCreate []*models.VirtualFile
 			// 待删除的文件
-			filesToDelete []File
+			filesToDelete []*models.VirtualFile
 			// 找出需要更新的文件
 			filesToUpdateMap = map[int64]map[string]any{}
 			// 需要深度扫描的文件
-			filesToDeep []File
+			filesToDeep []*models.VirtualFile
 		)
 
 		// 遍历扫描到的文件，找出新增和更新的文件
@@ -235,7 +139,7 @@ func (w *fileBusWorker) scanFile(ctx context.Context, rootId int64, deep bool) e
 		if len(filesToCreate) > 0 {
 			var count int64
 
-			count, err = w.batchCreate(ctx, file.ID, filesToCreate)
+			count, err = w.batchCreateVirtualFile(ctx, file.ID, filesToCreate)
 			if err != nil {
 				w.logger.Error("批量创建子文件失败",
 					zap.Error(err),
@@ -254,7 +158,7 @@ func (w *fileBusWorker) scanFile(ctx context.Context, rootId int64, deep bool) e
 
 		// 更新文件
 		for id, item := range filesToUpdateMap {
-			if err = w.update(ctx, id, item); err != nil {
+			if err = w.updateVirtualFile(ctx, id, item); err != nil {
 				w.logger.Error("更新文件失败",
 					zap.Error(err),
 					zap.String("file_name", item["name"].(string)),
@@ -269,7 +173,7 @@ func (w *fileBusWorker) scanFile(ctx context.Context, rootId int64, deep bool) e
 		}
 
 		for _, item := range filesToDelete {
-			if err = w.delete(ctx, item.ID); err != nil {
+			if err = w.deleteVirtualFile(ctx, item.ID); err != nil {
 				w.logger.Error("删除文件失败",
 					zap.Error(err),
 					zap.String("file_name", item.Name),
@@ -283,13 +187,31 @@ func (w *fileBusWorker) scanFile(ctx context.Context, rootId int64, deep bool) e
 			}
 		}
 
+		// 收集当前文件处理过程中的错误
+		if len(errs) > 0 {
+			mu.Lock()
+			scanErrors = append(scanErrors, errs...)
+			mu.Unlock()
+		}
+
 		nextWalkFiles = append(filesToCreate, filesToDeep...)
 
 		return nextWalkFiles
 	})
+	
+	// 返回收集到的错误
+	if err != nil {
+		return err
+	}
+	
+	if len(scanErrors) > 0 {
+		return fmt.Errorf("扫描过程中发生 %d 个错误: %v", len(scanErrors), scanErrors)
+	}
+	
+	return nil
 }
 
-func (w *fileBusWorker) walk(ctx context.Context, rootId int64, walkFunc walkFunc) error {
+func (w *busWorker) walkVirtualFile(ctx context.Context, rootId int64, walkFunc virtualFileWalkFunc) error {
 	db := w.db.WithContext(ctx)
 
 	file := &models.VirtualFile{}
@@ -301,8 +223,8 @@ func (w *fileBusWorker) walk(ctx context.Context, rootId int64, walkFunc walkFun
 			IsTop:      1,
 			OsType:     models.OsTypeFolder,
 			ParentId:   0,
-			ModifyDate: time.Now().Format("2006-01-02 15:04:05"),
-			CreateDate: time.Now().Format("2006-01-02 15:04:05"),
+			ModifyDate: time.Now().Format(time.DateTime),
+			CreateDate: time.Now().Format(time.DateTime),
 		}
 	} else {
 		if err := db.Where("id", rootId).First(file).Error; err != nil {
@@ -310,7 +232,7 @@ func (w *fileBusWorker) walk(ctx context.Context, rootId int64, walkFunc walkFun
 		}
 	}
 
-	children := make([]File, 0)
+	children := make([]*models.VirtualFile, 0)
 
 	// 如果是文件夹类型，递归处理
 	if file.IsFolder == 1 {
@@ -332,7 +254,7 @@ func (w *fileBusWorker) walk(ctx context.Context, rootId int64, walkFunc walkFun
 		// 如果只有一个线程或者文件数量很少，使用串行处理
 		if threadCount == 1 || len(nextFiles) <= 1 {
 			for _, nextFile := range nextFiles {
-				if err := w.walk(ctx, nextFile.ID, walkFunc); err != nil {
+				if err := w.walkVirtualFile(ctx, nextFile.ID, walkFunc); err != nil {
 					return err
 				}
 			}
@@ -344,14 +266,14 @@ func (w *fileBusWorker) walk(ctx context.Context, rootId int64, walkFunc walkFun
 
 			for _, nextFile := range nextFiles {
 				wg.Add(1)
-				go func(file File) {
+				go func(file *models.VirtualFile) {
 					defer wg.Done()
 
 					// 获取信号量
 					semaphore <- struct{}{}
 					defer func() { <-semaphore }()
 
-					if err := w.walk(ctx, file.ID, walkFunc); err != nil {
+					if err := w.walkVirtualFile(ctx, file.ID, walkFunc); err != nil {
 						errorChan <- err
 					}
 				}(nextFile)
@@ -373,13 +295,7 @@ func (w *fileBusWorker) walk(ctx context.Context, rootId int64, walkFunc walkFun
 	return nil
 }
 
-func (w *fileBusWorker) Close() {
-	if !w.lock.TryLock() {
-		w.lock.Unlock()
-	}
-}
-
-func (w *fileBusWorker) batchCreate(ctx context.Context, parentId int64, files []File) (int64, error) {
+func (w *busWorker) batchCreateVirtualFile(ctx context.Context, parentId int64, files []*models.VirtualFile) (int64, error) {
 	w.logger.Debug("批量创建文件", zap.Int64("parent_id", parentId), zap.Int("file_count", len(files)))
 
 	// 检查 pid
@@ -391,58 +307,19 @@ func (w *fileBusWorker) batchCreate(ctx context.Context, parentId int64, files [
 		file.ParentId = parentId
 	}
 
-	result := w.db.WithContext(ctx).CreateInBatches(files, 1000)
+	result := w.withLock(ctx, func(db *gorm.DB) *gorm.DB {
+		return db.CreateInBatches(files, 1000)
+	})
 
-	// hook
+	//hook
 	for _, file := range files {
-		_ = w.createHook(ctx, file)
+		_ = w.createVirtualFileHook(ctx, file)
 	}
 
 	return result.RowsAffected, result.Error
 }
 
-func (w *fileBusWorker) createHook(ctx context.Context, file File) error {
-	if file.ID == 0 {
-		return errors.New("file.ID is invalid")
-	}
-
-	var errs []error
-
-	{
-		if !shared.StrmFileEnable {
-			goto strmOver
-		}
-
-		extName := strings.TrimPrefix(filepath.Ext(file.Name), ".")
-
-		if len(shared.StrmSupportFileExtList) > 0 && lo.IndexOf(shared.StrmSupportFileExtList, extName) == -1 {
-			goto strmOver
-		}
-
-		filePath, err := w.calFilePath(ctx, file.ID)
-		if err != nil {
-			errs = append(errs, err)
-		}
-
-		filePath = path.Join(path.Dir(filePath), strings.TrimSuffix(file.Name, filepath.Ext(file.Name))+".strm")
-
-		_ = shared.MediaBus.Publish(ctx, TopicMediaAddStrmFile, TopicMediaAddStrmFileRequest{
-			FileID: file.ID,
-			Path:   filePath,
-		})
-	}
-strmOver:
-
-	return errors2.Join(errs...)
-}
-
-func (w *fileBusWorker) update(ctx context.Context, id int64, mp map[string]any) error {
-	w.logger.Debug("更新文件", zap.Int64("file_id", id), zap.Any("data", mp))
-
-	return w.db.WithContext(ctx).Model(&models.VirtualFile{}).Where("id", id).Updates(mp).Error
-}
-
-func (w *fileBusWorker) delete(ctx context.Context, id int64) error {
+func (w *busWorker) deleteVirtualFile(ctx context.Context, id int64) error {
 	w.logger.Debug("删除文件", zap.Int64("file_id", id))
 
 	file := new(models.VirtualFile)
@@ -457,7 +334,7 @@ func (w *fileBusWorker) delete(ctx context.Context, id int64) error {
 	}
 
 	if file.IsFolder == 1 {
-		children := make([]File, 0)
+		children := make([]*models.VirtualFile, 0)
 		if err := w.getDB(ctx).Where("parent_id = ?", id).Find(&children).Error; err != nil {
 			return fmt.Errorf("获取子节点失败: %w", err)
 		}
@@ -472,7 +349,7 @@ func (w *fileBusWorker) delete(ctx context.Context, id int64) error {
 		if threadCount == 1 || len(children) <= 1 {
 			var errs []error
 			for _, child := range children {
-				if err := w.delete(ctx, child.ID); err != nil {
+				if err := w.deleteVirtualFile(ctx, child.ID); err != nil {
 					w.logger.Error("删除子文件失败",
 						zap.Int64("parent_id", id),
 						zap.Int64("child_id", child.ID),
@@ -491,14 +368,14 @@ func (w *fileBusWorker) delete(ctx context.Context, id int64) error {
 
 			for _, child := range children {
 				wg.Add(1)
-				go func(childFile File) {
+				go func(childFile *models.VirtualFile) {
 					defer wg.Done()
 
 					// 获取信号量
 					semaphore <- struct{}{}
 					defer func() { <-semaphore }()
 
-					if err := w.delete(ctx, childFile.ID); err != nil {
+					if err := w.deleteVirtualFile(ctx, childFile.ID); err != nil {
 						w.logger.Error("删除子文件失败",
 							zap.Int64("parent_id", id),
 							zap.Int64("child_id", childFile.ID),
@@ -527,12 +404,24 @@ func (w *fileBusWorker) delete(ctx context.Context, id int64) error {
 	}
 
 	// hook
-	_ = w.deleteHook(ctx, file.ID)
+	_ = w.deleteVirtualFileHook(ctx, file.ID)
 
-	return w.getDB(ctx).Where("id", id).Delete(&models.VirtualFile{}).Error
+	return w.withLock(ctx, func(db *gorm.DB) *gorm.DB {
+		return db.Where("id", id).Delete(&models.VirtualFile{})
+	}).Error
 }
 
-func (w *fileBusWorker) deleteHook(ctx context.Context, fileId int64) error {
+func (w *busWorker) updateVirtualFile(ctx context.Context, id int64, mp map[string]any) error {
+	w.logger.Debug("更新文件", zap.Int64("file_id", id), zap.Any("data", mp))
+
+	return w.withLock(ctx, func(db *gorm.DB) *gorm.DB {
+		return db.Model(&models.VirtualFile{}).Where("id", id).Updates(mp)
+	}).Error
+}
+
+func (w *busWorker) deleteVirtualFileHook(ctx context.Context, fileId int64) error {
+	w.logger.Debug("删除文件", zap.Int64("file_id", fileId))
+
 	if fileId == 0 {
 		return errors.New("file.ID is invalid")
 	}
@@ -540,11 +429,7 @@ func (w *fileBusWorker) deleteHook(ctx context.Context, fileId int64) error {
 	var errs []error
 
 	if shared.LinkFileAutoDelete {
-		err := shared.MediaBus.Publish(ctx, TopicMediaDeleteLinkFile, TopicMediaDeleteLinkFileRequest{
-			FileID: fileId,
-		})
-
-		if err != nil {
+		if err := w.delMediaFile(ctx, fileId); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -552,7 +437,41 @@ func (w *fileBusWorker) deleteHook(ctx context.Context, fileId int64) error {
 	return errors2.Join(errs...)
 }
 
-func (w *fileBusWorker) scanTop(ctx context.Context) error {
+func (w *busWorker) createVirtualFileHook(ctx context.Context, file *models.VirtualFile) error {
+	if file.ID == 0 {
+		return errors.New("file.ID is invalid")
+	}
+
+	var errs []error
+
+	{
+		if !shared.StrmFileEnable {
+			goto strmOver
+		}
+
+		extName := strings.TrimPrefix(filepath.Ext(file.Name), ".")
+
+		if len(shared.StrmSupportFileExtList) > 0 && lo.IndexOf(shared.StrmSupportFileExtList, extName) == -1 {
+			goto strmOver
+		}
+
+		filePath, err := w.calFilePath(ctx, file.ID)
+		if err != nil {
+			errs = append(errs, err)
+		}
+
+		filePath = path.Join(path.Dir(filePath), strings.TrimSuffix(file.Name, filepath.Ext(file.Name))+".strm")
+
+		if err = w.addStrmMediaFile(ctx, file.ID, filePath); err != nil {
+			errs = append(errs, err)
+		}
+	}
+strmOver:
+
+	return errors2.Join(errs...)
+}
+
+func (w *busWorker) scanTopVirtualFiles(ctx context.Context) error {
 	// 读取所有顶层文件
 	var topFiles = make([]*models.VirtualFile, 0)
 	if err := w.getDB(ctx).Where("is_top = 1").Find(&topFiles).Error; err != nil {
@@ -575,7 +494,7 @@ func (w *fileBusWorker) scanTop(ctx context.Context) error {
 			}
 		}
 
-		_ = w.scanFile(ctx, f.ID, false)
+		_ = w.scanVirtualFile(ctx, f.ID, false)
 	}
 
 	if len(errs) > 0 {
@@ -585,37 +504,10 @@ func (w *fileBusWorker) scanTop(ctx context.Context) error {
 	return nil
 }
 
-func (w *fileBusWorker) getDB(ctx context.Context) *gorm.DB {
-	return w.db.WithContext(ctx).Model(&models.VirtualFile{})
-}
-
-// CalFilePath 计算文件的路径
-func (w *fileBusWorker) calFilePath(ctx context.Context, id int64) (string, error) {
-	if id == 0 {
-		return "/", nil
-	}
-
-	file := new(models.VirtualFile)
-	if err := w.getDB(ctx).Where("id = ?", id).First(file).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", FileNotFound
-		}
-
-		return "", fmt.Errorf("获取文件信息失败 id=%d: %w", id, err)
-	}
-
-	parentPath, err := w.calFilePath(ctx, file.ParentId)
-	if err != nil {
-		return "", err
-	}
-
-	return path.Join(parentPath, file.Name), nil
-}
-
-func (w *fileBusWorker) buildMediaFile(ctx context.Context, fileId int64) (int64, error) {
+func (w *busWorker) buildMediaFile(ctx context.Context, fileId int64) (int64, error) {
 	var count int64
 
-	if err := w.walk(ctx, fileId, func(ctx context.Context, file File, childrenFiles []File) (nextWalkFiles []File) {
+	if err := w.walkVirtualFile(ctx, fileId, func(ctx context.Context, file *models.VirtualFile, childrenFiles []*models.VirtualFile) (nextWalkFiles []*models.VirtualFile) {
 		if file.IsFolder == 1 {
 			return childrenFiles
 		}
@@ -633,11 +525,7 @@ func (w *fileBusWorker) buildMediaFile(ctx context.Context, fileId int64) (int64
 
 		filePath = path.Join(path.Dir(filePath), strings.TrimSuffix(file.Name, filepath.Ext(file.Name))+".strm")
 
-		err = shared.MediaBus.Publish(ctx, TopicMediaAddStrmFile, TopicMediaAddStrmFileRequest{
-			FileID: file.ID,
-			Path:   filePath,
-		})
-		if err == nil {
+		if err = w.addStrmMediaFile(ctx, file.ID, filePath); err == nil {
 			atomic.AddInt64(&count, 1)
 		}
 
@@ -646,5 +534,74 @@ func (w *fileBusWorker) buildMediaFile(ctx context.Context, fileId int64) (int64
 		return 0, err
 	}
 
-	return int64(int(count)), nil
+	return atomic.LoadInt64(&count), nil
+}
+
+// calFilePath 计算文件的路径
+func (w *busWorker) calFilePath(ctx context.Context, id int64) (string, error) {
+	return w.calFilePathWithCache(ctx, id, make(map[int64]*models.VirtualFile))
+}
+
+// calFilePathWithCache 使用缓存优化的路径计算方法
+func (w *busWorker) calFilePathWithCache(ctx context.Context, id int64, cache map[int64]*models.VirtualFile) (string, error) {
+	if id == 0 {
+		return "/", nil
+	}
+
+	// 检查缓存
+	file, exists := cache[id]
+	if !exists {
+		// 批量查询当前文件及其所有父级文件
+		files, err := w.batchQueryParentFiles(ctx, id)
+		if err != nil {
+			return "", err
+		}
+
+		// 将查询结果加入缓存
+		for _, f := range files {
+			cache[f.ID] = f
+		}
+
+		file, exists = cache[id]
+		if !exists {
+			return "", FileNotFound
+		}
+	}
+
+	parentPath, err := w.calFilePathWithCache(ctx, file.ParentId, cache)
+	if err != nil {
+		return "", err
+	}
+
+	return path.Join(parentPath, file.Name), nil
+}
+
+// batchQueryParentFiles 批量查询文件及其所有父级文件
+func (w *busWorker) batchQueryParentFiles(ctx context.Context, id int64) ([]*models.VirtualFile, error) {
+	var files []*models.VirtualFile
+	var currentId = id
+	var ids []int64
+
+	// 收集所有需要查询的ID
+	for currentId != 0 {
+		ids = append(ids, currentId)
+		
+		// 查询当前文件的父ID
+		var parentId int64
+		if err := w.getDB(ctx).Model(&models.VirtualFile{}).Select("parent_id").Where("id = ?", currentId).Scan(&parentId).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				break
+			}
+			return nil, fmt.Errorf("查询父ID失败 id=%d: %w", currentId, err)
+		}
+		
+		currentId = parentId
+	}
+
+	// 批量查询所有文件信息
+	if err := w.getDB(ctx).Where("id IN ?", ids).Find(&files).Error; err != nil {
+		return nil, fmt.Errorf("批量查询文件信息失败: %w", err)
+	}
+
+	return files, nil
 }

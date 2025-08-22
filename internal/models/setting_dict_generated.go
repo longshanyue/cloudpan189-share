@@ -12,21 +12,22 @@ import (
 // 常量定义
 const (
 	SettingDictKeyMultipleStreamThreadCount = "multiple_stream_thread_count"
-	SettingDictKeyMultipleStreamChunkSize = "multiple_stream_chunk_size"
-	SettingDictKeyStrmFileEnable = "strm_file_enable"
-	SettingDictKeyStrmSupportFileExtList = "strm_support_file_ext_list"
-	SettingDictKeyLinkFileAutoDelete = "link_file_auto_delete"
-	SettingDictKeyStrmBaseURL = "strm_base_url"
+	SettingDictKeyMultipleStreamChunkSize   = "multiple_stream_chunk_size"
+	SettingDictKeyStrmFileEnable            = "strm_file_enable"
+	SettingDictKeyStrmSupportFileExtList    = "strm_support_file_ext_list"
+	SettingDictKeyLinkFileAutoDelete        = "link_file_auto_delete"
+	SettingDictKeyStrmBaseURL               = "strm_base_url"
 )
 
 // 默认值定义
 const (
 	DefaultMultipleStreamThreadCount = 6
-	DefaultMultipleStreamChunkSize = 4194304
-	DefaultStrmFileEnable = false
-	DefaultLinkFileAutoDelete = true
-	DefaultStrmBaseURL = ""
+	DefaultMultipleStreamChunkSize   = 4194304
+	DefaultStrmFileEnable            = false
+	DefaultLinkFileAutoDelete        = true
+	DefaultStrmBaseURL               = ""
 )
+
 var (
 	DefaultStrmSupportFileExtList = []string{"mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "m4v", "mpg", "mpeg", "m2v", "m4p", "m4b", "ts", "mts", "m2ts", "m2t", "mxf", "dv", "dvr-ms", "asf", "3gp", "3g2", "f4v", "f4p", "f4a", "f4b", "vob", "ogv", "ogg", "divx", "xvid", "rm", "rmvb", "dat", "nsv", "qt", "amv", "mpv", "m1v", "svi", "viv", "fli", "flc"}
 )

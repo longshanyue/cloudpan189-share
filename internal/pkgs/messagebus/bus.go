@@ -2,6 +2,7 @@ package messagebus
 
 import (
 	"context"
+
 	"github.com/pkg/errors"
 
 	"go.uber.org/zap"
@@ -200,11 +201,11 @@ func (b *ConcurrentMessageBus) GetRuntimeStats() RuntimeStats {
 	// 统计worker状态
 	var idleWorkers, processingWorkers, stoppingWorkers, stoppedWorkers int
 	workers := make([]WorkerInfo, len(b.workers))
-	
+
 	for i, worker := range b.workers {
 		info := worker.getInfo()
 		workers[i] = info
-		
+
 		switch info.Status {
 		case WorkerStatusIdle:
 			idleWorkers++
@@ -237,7 +238,7 @@ func (b *ConcurrentMessageBus) GetWorkerInfo(workerID int) (WorkerInfo, bool) {
 	if workerID < 1 || workerID > len(b.workers) {
 		return WorkerInfo{}, false
 	}
-	
+
 	worker := b.workers[workerID-1] // workerID从1开始，数组从0开始
 	return worker.getInfo(), true
 }
