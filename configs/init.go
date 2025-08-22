@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	"flag"
 	"fmt"
+	"github.com/joho/godotenv"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -40,6 +41,11 @@ func init() {
 	flag.Parse()
 
 	conf.MustLoad(configPath, c)
+
+	envFiles := []string{".env", ".env.local", ".env.example"}
+	for _, envFile := range envFiles {
+		_ = godotenv.Load(envFile)
+	}
 }
 
 func Init() {
@@ -118,10 +124,21 @@ func Init() {
 		var options = []logger2.Option{
 			logger2.WithTimeLayout(time.DateTime),
 			logger2.WithFileRotationP(c.LogFile),
-			logger2.WithInfoLevel(),
-			logger2.WithDebugLevel(),
 			logger2.WithOutputInConsole(),
 			// logger2.WithField("build_info", fmt.Sprintf("[buildDate:%s]&&[commit:%s]&&[gitSummary:%s]&&[gitBranch:%s]", BuildDate, Commit, GitSummary, GitBranch)),
+		}
+
+		if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
+			switch logLevel {
+			case "debug":
+				options = append(options, logger2.WithDebugLevel())
+			case "warn":
+				options = append(options, logger2.WithWarnLevel())
+			case "error":
+				options = append(options, logger2.WithErrorLevel())
+			default:
+				options = append(options, logger2.WithInfoLevel())
+			}
 		}
 
 		logger, err = logger2.NewJSONLogger(options...)
