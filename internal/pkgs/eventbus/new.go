@@ -17,6 +17,9 @@ func NewWithConfig(config *Config) EventBus {
 		eventCh:     make(chan *Event, config.BufferSize),
 		done:        make(chan struct{}),
 		concurrency: make(chan struct{}, config.MaxConcurrency),
+		// 初始化任务状态跟踪
+		runningTasks: make(map[string]*Event),
+		pendingQueue: make([]*Event, 0),
 	}
 
 	// 启动全局事件处理器

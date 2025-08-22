@@ -49,3 +49,7 @@ func (w *busWorker) doSubscribe() {
 	w.doSubscribeTopicAddStrmFile()
 	w.doSubscribeTopicDeleteLinkVirtualFile()
 }
+
+func Status() eventbus.BusStats {
+	return singletonBusWork.bus.GetStats()
+}

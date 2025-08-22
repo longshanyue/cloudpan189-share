@@ -54,7 +54,7 @@ func (s *ScanFileJob) Start(ctx context.Context) error {
 			}
 		}
 
-		s.logger.Info("scan file job stopped")
+		s.logger.Info("文件扫描任务已停止")
 	})
 
 	return nil
@@ -63,7 +63,7 @@ func (s *ScanFileJob) Start(ctx context.Context) error {
 func (s *ScanFileJob) doJob(ctx context.Context) bool {
 	defer func() {
 		if r := recover(); r != nil {
-			s.logger.Error("scan file job panic",
+			s.logger.Error("文件扫描任务发生异常",
 				zap.Any("panic", r),
 				zap.String("stack", string(debug.Stack())))
 		}
@@ -76,7 +76,7 @@ func (s *ScanFileJob) doJob(ctx context.Context) bool {
 
 	select {
 	case <-s.ctx.Done():
-		s.logger.Info("scan file job stopped")
+		s.logger.Info("文件扫描任务已停止")
 
 		return false
 	case <-time.After(refreshMinutes * time.Minute):
@@ -84,17 +84,17 @@ func (s *ScanFileJob) doJob(ctx context.Context) bool {
 			return true
 		}
 
-		//case <-time.After(time.Second * 5):
-		//stats := shared.FileBus.GetRuntimeStats()
-		//if (stats.QueueLength + stats.ProcessingWorkers) > 0 {
-		//	s.logger.Info("正在待处理或者处理中的任务，跳过本次定时扫描")
-		//
-		//	return true
-		//}
+		status := bus.Status()
 
-		s.logger.Info("scan top file job started")
+		if (status.RunningCount + status.QueueLength) > 0 {
+			s.logger.Info("有正在待处理或者处理中的任务，跳过本次定时扫描")
+
+			return true
+		}
+
+		s.logger.Info("开始定时扫描文件")
 		if err := bus.PublishVirtualFileScanTop(ctx); err != nil {
-			s.logger.Error("failed to publish scan top job", zap.Error(err))
+			s.logger.Error("定时扫描文件失败", zap.Error(err))
 		}
 	}
 

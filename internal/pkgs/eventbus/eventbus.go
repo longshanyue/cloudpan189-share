@@ -2,8 +2,10 @@ package eventbus
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // eventBus 事件总线实现
@@ -14,11 +16,16 @@ type eventBus struct {
 	closed      int32
 	config      *Config
 
-	// 全局事件处理
 	eventCh     chan *Event
 	done        chan struct{}
-	concurrency chan struct{}  // 全局并发控制信号量
+	concurrency chan struct{} // 全局并发控制信号量
 	wg          sync.WaitGroup // 等待所有处理完成
+	
+	// 任务状态跟踪
+	runningTasks map[string]*Event // 正在运行的任务
+	pendingQueue []*Event          // 待处理队列快照
+	completedCount int64            // 已完成任务计数
+	taskMu       sync.RWMutex      // 任务状态锁
 }
 
 // Subscribe 订阅
@@ -96,10 +103,13 @@ func (eb *eventBus) Publish(ctx context.Context, topic string, data interface{})
 		}
 
 		event := &Event{
+			ID:      fmt.Sprintf("event_%d_%s", atomic.AddInt64(&eb.counter, 1), generateID(eb.counter)),
 			Topic:   topic,
 			Data:    data,
 			Context: ctx,
 			Handler: sub.handler,
+			Status:  "pending",
+			StartTime: time.Now(),
 		}
 
 		// 发送到全局事件队列
@@ -162,11 +172,14 @@ func (eb *eventBus) PublishSync(ctx context.Context, topic string, data interfac
 		wg.Add(1)
 
 		event := &Event{
+			ID:      fmt.Sprintf("event_%d_%s", atomic.AddInt64(&eb.counter, 1), generateID(eb.counter)),
 			Topic:   topic,
 			Data:    data,
 			Context: ctx,
 			Handler: sub.handler,
 			Result:  make(chan error, 1),
+			Status:  "pending",
+			StartTime: time.Now(),
 		}
 
 		// 发送到全局事件队列
@@ -271,6 +284,12 @@ func (eb *eventBus) handleEventConcurrent(event *Event) {
 func (eb *eventBus) handleEventDirect(event *Event) {
 	var err error
 
+	// 标记任务开始运行
+	eb.taskMu.Lock()
+	event.Status = "running"
+	eb.runningTasks[event.ID] = event
+	eb.taskMu.Unlock()
+
 	// 检查context
 	select {
 	case <-event.Context.Done():
@@ -280,12 +299,84 @@ func (eb *eventBus) handleEventDirect(event *Event) {
 		err = event.Handler(event.Context, event.Data)
 	}
 
+	// 标记任务完成
+	eb.taskMu.Lock()
+	event.Status = "completed"
+	delete(eb.runningTasks, event.ID)
+	atomic.AddInt64(&eb.completedCount, 1)
+	eb.taskMu.Unlock()
+
 	// 返回结果（同步发布时）
 	if event.Result != nil {
 		select {
 		case event.Result <- err:
 		default:
 		}
+	}
+}
+
+// GetRunningTasks 获取正在运行的任务
+func (eb *eventBus) GetRunningTasks() []TaskInfo {
+	eb.taskMu.RLock()
+	defer eb.taskMu.RUnlock()
+
+	tasks := make([]TaskInfo, 0, len(eb.runningTasks))
+	for _, event := range eb.runningTasks {
+		tasks = append(tasks, TaskInfo{
+			ID:        event.ID,
+			Topic:     event.Topic,
+			Status:    event.Status,
+			StartTime: event.StartTime,
+			Data:      event.Data,
+		})
+	}
+	return tasks
+}
+
+// GetPendingTasks 获取待处理的任务
+func (eb *eventBus) GetPendingTasks() []TaskInfo {
+	eb.taskMu.RLock()
+	defer eb.taskMu.RUnlock()
+
+	tasks := make([]TaskInfo, 0, len(eb.pendingQueue))
+	for _, event := range eb.pendingQueue {
+		tasks = append(tasks, TaskInfo{
+			ID:        event.ID,
+			Topic:     event.Topic,
+			Status:    event.Status,
+			StartTime: event.StartTime,
+			Data:      event.Data,
+		})
+	}
+	return tasks
+}
+
+// GetStats 获取事件总线统计信息
+func (eb *eventBus) GetStats() BusStats {
+	eb.taskMu.RLock()
+	runningCount := len(eb.runningTasks)
+	pendingCount := len(eb.pendingQueue)
+	eb.taskMu.RUnlock()
+
+	eb.mu.RLock()
+	totalSubscribers := 0
+	for _, subs := range eb.subscribers {
+		totalSubscribers += len(subs)
+	}
+	eb.mu.RUnlock()
+
+	// ActiveWorkers = 正在使用的并发槽位数
+	// 注意：concurrency 是一个缓冲通道，len(eb.concurrency) 表示当前通道中的元素数量
+	// 当 goroutine 获取许可时，会向通道发送数据，所以 len(eb.concurrency) 就是当前活跃的 worker 数量
+	activeWorkers := len(eb.concurrency)
+
+	return BusStats{
+		RunningCount:     runningCount,
+		PendingCount:     pendingCount,
+		CompletedCount:   atomic.LoadInt64(&eb.completedCount),
+		QueueLength:      len(eb.eventCh),
+		ActiveWorkers:    activeWorkers,
+		TotalSubscribers: totalSubscribers,
 	}
 }
 

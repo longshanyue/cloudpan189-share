@@ -20,7 +20,7 @@ func Init() {
 			logger: logger,
 			bus: eventbus.NewWithConfig(&eventbus.Config{
 				BufferSize:     8,
-				MaxConcurrency: 1,
+				MaxConcurrency: 0,
 			}),
 			client: client.New(),
 		}
