@@ -1,5 +1,11 @@
 import api from './index'
-import { JobStat } from './shared'
+
+// 文件扫描统计信息
+export interface FileScanStat {
+  fileId: number
+  waitCount: number
+  scannedCount: number
+}
 
 // 存储相关接口类型定义
 export interface Storage {
@@ -17,7 +23,7 @@ export interface Storage {
     share_access_code?: string
     disable_auto_scan?: boolean
   }
-  jobStatus?: JobStat
+  fileScanStat?: FileScanStat
 }
 
 export interface AddStorageRequest {

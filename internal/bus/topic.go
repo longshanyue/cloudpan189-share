@@ -30,7 +30,7 @@ type TopicFileDeleteRequest struct {
 }
 
 type TopicFileRebuildMediaFileRequest struct {
-	MediaTypes []models.MediaType
+	MediaTypes []models.MediaType `json:"mediaTypes"`
 }
 
 type TopicMediaDeleteLinkFileRequest struct {
@@ -46,5 +46,5 @@ type TopicMediaAddStrmFileRequest struct {
 }
 
 type TopicMediaClearAllMediaRequest struct {
-	MediaTypes []models.MediaType
+	MediaTypes []models.MediaType `json:"mediaTypes"`
 }

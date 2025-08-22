@@ -26,7 +26,16 @@ type virtualFileWalkFunc func(ctx context.Context, file *models.VirtualFile, chi
 func (w *busWorker) scanVirtualFile(ctx context.Context, rootId int64, deep bool) error {
 	var scanErrors []error
 	var mu sync.Mutex
-	
+
+	fss := &FileScanStat{
+		FileId:       rootId,
+		ScannedCount: 0,
+		WaitCount:    0,
+	}
+
+	w.fileScanStat.Store(rootId, fss)
+	defer w.fileScanStat.Delete(rootId)
+
 	err := w.walkVirtualFile(ctx, rootId, func(ctx context.Context, file *models.VirtualFile, oldFiles []*models.VirtualFile) (nextWalkFiles []*models.VirtualFile) {
 		var (
 			newFiles = make([]*models.VirtualFile, 0)
@@ -51,6 +60,11 @@ func (w *busWorker) scanVirtualFile(ctx context.Context, rootId int64, deep bool
 			mu.Unlock()
 			return nil
 		}
+
+		fss.WaitCount += int64(len(newFiles))
+		defer func() {
+			fss.ScannedCount += int64(len(newFiles))
+		}()
 
 		// 数据准备
 
@@ -198,16 +212,16 @@ func (w *busWorker) scanVirtualFile(ctx context.Context, rootId int64, deep bool
 
 		return nextWalkFiles
 	})
-	
+
 	// 返回收集到的错误
 	if err != nil {
 		return err
 	}
-	
+
 	if len(scanErrors) > 0 {
 		return fmt.Errorf("扫描过程中发生 %d 个错误: %v", len(scanErrors), scanErrors)
 	}
-	
+
 	return nil
 }
 
@@ -585,7 +599,7 @@ func (w *busWorker) batchQueryParentFiles(ctx context.Context, id int64) ([]*mod
 	// 收集所有需要查询的ID
 	for currentId != 0 {
 		ids = append(ids, currentId)
-		
+
 		// 查询当前文件的父ID
 		var parentId int64
 		if err := w.getDB(ctx).Model(&models.VirtualFile{}).Select("parent_id").Where("id = ?", currentId).Scan(&parentId).Error; err != nil {
@@ -594,7 +608,7 @@ func (w *busWorker) batchQueryParentFiles(ctx context.Context, id int64) ([]*mod
 			}
 			return nil, fmt.Errorf("查询父ID失败 id=%d: %w", currentId, err)
 		}
-		
+
 		currentId = parentId
 	}
 

@@ -1,5 +1,7 @@
 filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
 filippo.io/edwards25519 v1.1.0/go.mod h1:BxyFTGdWcka3PhytdK4V28tE5sGfRvvvRV7EaN4VDT4=
+github.com/bradenaw/juniper v0.15.3 h1:RHIAMEDTpvmzV1wg1jMAHGOoI2oJUSPx3lxRldXnFGo=
+github.com/bradenaw/juniper v0.15.3/go.mod h1:UX4FX57kVSaDp4TPqvSjkAAewmRFAfXf27BOs5z9dq8=
 github.com/bytedance/gopkg v0.1.2 h1:8o2feYuxknDpN+O7kPwvSXfMEKfYvJYiA2K7aonoMEQ=
 github.com/bytedance/gopkg v0.1.2/go.mod h1:576VvJ+eJgyCzdjS+c4+77QF3p7ubbtiKARP3TxducM=
 github.com/bytedance/sonic v1.11.6 h1:oUp34TzMlL+OY1OUWxHqsdkgC/Zfc85zGqw9siXjrc0=

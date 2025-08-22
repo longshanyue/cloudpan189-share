@@ -12,6 +12,9 @@
         </div>
         
         <div class="header-right">
+          <!-- 总线状态显示 (仅管理员可见) -->
+          <BusStatus v-if="authStore.isAdmin" />
+          
           <div class="user-menu">
             <div class="user-avatar">
               <span class="avatar-text">{{ authStore.user?.username?.charAt(0).toUpperCase() }}</span>
@@ -124,6 +127,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSettingStore } from '@/stores/setting'
 import Icons from './Icons.vue'
+import BusStatus from './BusStatus.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -235,6 +239,7 @@ const handleLogout = async () => {
 .header-right {
   display: flex;
   align-items: center;
+  gap: 1rem;
 }
 
 .user-menu {

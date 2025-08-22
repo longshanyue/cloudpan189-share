@@ -3,6 +3,7 @@ module github.com/xxcheng123/cloudpan189-share
 go 1.24.4
 
 require (
+	github.com/bradenaw/juniper v0.15.3
 	github.com/bytedance/gopkg v0.1.2
 	github.com/deckarep/golang-set/v2 v2.8.0
 	github.com/gin-gonic/gin v1.10.1

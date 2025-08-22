@@ -117,6 +117,7 @@ func StartHTTPServer() error {
 	{
 		advancedOpsRouter.POST("/rebuild_strm", advancedOpsService.RebuildStrm())
 		advancedOpsRouter.POST("/clear_media", advancedOpsService.ClearMedia())
+		advancedOpsRouter.GET("/bus_detail", advancedOpsService.BusDetail())
 	}
 
 	{

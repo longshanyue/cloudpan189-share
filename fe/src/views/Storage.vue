@@ -113,16 +113,10 @@
                 </span>
               </td>
               <td>
-                <div v-if="storage.jobStatus" class="job-status">
-                  <div class="job-status-inline">
-                    <span class="status-badge"
-                      :class="storage.jobStatus.status === 0 ? 'status-waiting' : 'status-running'">
-                      {{ JobStatusMap[storage.jobStatus.jobType] }}：
-                      {{ storage.jobStatus.status === 0 ? '等待执行中' : '执行中' }}
-                      <span
-                        v-if="storage.jobStatus.status === 1 && (storage.jobStatus.jobType === 'refresh' || storage.jobStatus.jobType === 'deep_refresh')">
-                        ，进度: {{ storage.jobStatus.scannedCount || 0 }} / {{ storage.jobStatus.waitCount || 0 }}
-                      </span>
+                <div v-if="storage.fileScanStat" class="scan-status">
+                  <div class="scan-status-inline">
+                    <span class="status-badge status-running">
+                      刷新中：已完成 {{ storage.fileScanStat.scannedCount }} / 待扫描 {{ storage.fileScanStat.waitCount }}
                     </span>
                   </div>
                 </div>
@@ -291,7 +285,6 @@ import SubsectionTitle from '@/components/SubsectionTitle.vue'
 import { ref, onMounted, computed, reactive, onUnmounted } from 'vue'
 import { storageApi, type Storage, type AddStorageRequest } from '@/api/storage'
 import { cloudTokenApi, type CloudToken } from '@/api/cloudtoken'
-import { JobStatusMap } from '@/api/shared'
 import { toast } from '@/utils/toast'
 import { confirmDialog } from '@/utils/confirm'
 import Select from '@/components/Select.vue'
@@ -1178,15 +1171,15 @@ onMounted(() => {
   color: #dc2626;
 }
 
-/* 任务状态样式 */
-.job-status {
+/* 扫描状态样式 */
+.scan-status {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   min-width: 160px;
 }
 
-.job-status-inline {
+.scan-status-inline {
   display: flex;
   align-items: center;
   justify-content: center;

@@ -1,6 +1,8 @@
 package advancedops
 
 import (
+	"fmt"
+	"go.uber.org/zap"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -13,9 +15,11 @@ import (
 func (s *service) RebuildStrm() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		if err := bus.PublishRebuildMediaFile(ctx, models.MediaTypeStrm); err != nil {
+			s.logger.Error("重建 strm 文件失败", zap.Error(err))
+
 			ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
 				Code:    http.StatusInternalServerError,
-				Message: "重建 strm 文件失败",
+				Message: fmt.Sprintf("重建 strm 文件失败: %s", err.Error()),
 			})
 
 			return

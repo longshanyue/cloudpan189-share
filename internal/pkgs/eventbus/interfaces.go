@@ -20,7 +20,7 @@ type TaskInfo struct {
 	ID        string      `json:"id"`
 	Topic     string      `json:"topic"`
 	Status    string      `json:"status"` // "pending", "running", "completed"
-	StartTime time.Time   `json:"start_time"`
+	StartTime time.Time   `json:"startTime"`
 	Data      interface{} `json:"data,omitempty"`
 }
 

@@ -2,6 +2,7 @@ package bus
 
 import (
 	"context"
+	"github.com/bradenaw/juniper/xsync"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -25,6 +26,14 @@ type busWorker struct {
 	client client.Client
 
 	dbLock sync.Mutex
+
+	fileScanStat xsync.Map[int64, *FileScanStat]
+}
+
+type FileScanStat struct {
+	FileId       int64 `json:"fileId"`
+	WaitCount    int64 `json:"waitCount"`
+	ScannedCount int64 `json:"scannedCount"`
 }
 
 // withLock  默认使用 sqlite，性能差
@@ -51,5 +60,32 @@ func (w *busWorker) doSubscribe() {
 }
 
 func Status() eventbus.BusStats {
+	a := singletonBusWork.bus.GetPendingTasks()
+	b := singletonBusWork.bus.GetRunningTasks()
+	_, _ = a, b
+
 	return singletonBusWork.bus.GetStats()
+}
+
+type DetailInfo struct {
+	RunningTasks []eventbus.TaskInfo `json:"runningTasks"`
+	PendingTasks []eventbus.TaskInfo `json:"pendingTasks"`
+	Stats        eventbus.BusStats   `json:"stats"`
+}
+
+func Detail() DetailInfo {
+	return DetailInfo{
+		RunningTasks: singletonBusWork.bus.GetRunningTasks(),
+		PendingTasks: singletonBusWork.bus.GetPendingTasks(),
+		Stats:        singletonBusWork.bus.GetStats(),
+	}
+}
+
+func FindScanFileStat(fileId int64) *FileScanStat {
+	v, ok := singletonBusWork.fileScanStat.Load(fileId)
+	if !ok {
+		return nil
+	}
+
+	return v
 }

@@ -18,14 +18,14 @@ type eventBus struct {
 
 	eventCh     chan *Event
 	done        chan struct{}
-	concurrency chan struct{} // 全局并发控制信号量
+	concurrency chan struct{}  // 全局并发控制信号量
 	wg          sync.WaitGroup // 等待所有处理完成
-	
+
 	// 任务状态跟踪
-	runningTasks map[string]*Event // 正在运行的任务
-	pendingQueue []*Event          // 待处理队列快照
-	completedCount int64            // 已完成任务计数
-	taskMu       sync.RWMutex      // 任务状态锁
+	runningTasks   map[string]*Event // 正在运行的任务
+	pendingQueue   []*Event          // 待处理队列快照
+	completedCount int64             // 已完成任务计数
+	taskMu         sync.RWMutex      // 任务状态锁
 }
 
 // Subscribe 订阅
@@ -103,18 +103,22 @@ func (eb *eventBus) Publish(ctx context.Context, topic string, data interface{})
 		}
 
 		event := &Event{
-			ID:      fmt.Sprintf("event_%d_%s", atomic.AddInt64(&eb.counter, 1), generateID(eb.counter)),
-			Topic:   topic,
-			Data:    data,
-			Context: ctx,
-			Handler: sub.handler,
-			Status:  "pending",
+			ID:        fmt.Sprintf("event_%d_%s", atomic.AddInt64(&eb.counter, 1), generateID(eb.counter)),
+			Topic:     topic,
+			Data:      data,
+			Context:   ctx,
+			Handler:   sub.handler,
+			Status:    "pending",
 			StartTime: time.Now(),
 		}
 
 		// 发送到全局事件队列
 		select {
 		case eb.eventCh <- event:
+			// 添加到pending队列
+			eb.taskMu.Lock()
+			eb.pendingQueue = append(eb.pendingQueue, event)
+			eb.taskMu.Unlock()
 			successCount++
 		case <-ctx.Done():
 			failedCount++
@@ -172,19 +176,23 @@ func (eb *eventBus) PublishSync(ctx context.Context, topic string, data interfac
 		wg.Add(1)
 
 		event := &Event{
-			ID:      fmt.Sprintf("event_%d_%s", atomic.AddInt64(&eb.counter, 1), generateID(eb.counter)),
-			Topic:   topic,
-			Data:    data,
-			Context: ctx,
-			Handler: sub.handler,
-			Result:  make(chan error, 1),
-			Status:  "pending",
+			ID:        fmt.Sprintf("event_%d_%s", atomic.AddInt64(&eb.counter, 1), generateID(eb.counter)),
+			Topic:     topic,
+			Data:      data,
+			Context:   ctx,
+			Handler:   sub.handler,
+			Result:    make(chan error, 1),
+			Status:    "pending",
 			StartTime: time.Now(),
 		}
 
 		// 发送到全局事件队列
 		select {
 		case eb.eventCh <- event:
+			// 添加到pending队列
+			eb.taskMu.Lock()
+			eb.pendingQueue = append(eb.pendingQueue, event)
+			eb.taskMu.Unlock()
 			// 成功发送，等待结果
 			go func() {
 				defer wg.Done()
@@ -284,10 +292,17 @@ func (eb *eventBus) handleEventConcurrent(event *Event) {
 func (eb *eventBus) handleEventDirect(event *Event) {
 	var err error
 
-	// 标记任务开始运行
+	// 标记任务开始运行，从pending队列移除
 	eb.taskMu.Lock()
 	event.Status = "running"
 	eb.runningTasks[event.ID] = event
+	// 从pending队列中移除
+	for i, pendingEvent := range eb.pendingQueue {
+		if pendingEvent.ID == event.ID {
+			eb.pendingQueue = append(eb.pendingQueue[:i], eb.pendingQueue[i+1:]...)
+			break
+		}
+	}
 	eb.taskMu.Unlock()
 
 	// 检查context
@@ -303,6 +318,15 @@ func (eb *eventBus) handleEventDirect(event *Event) {
 	eb.taskMu.Lock()
 	event.Status = "completed"
 	delete(eb.runningTasks, event.ID)
+	
+	// 从pending队列中移除已完成的任务（如果还在队列中）
+	for i, pendingEvent := range eb.pendingQueue {
+		if pendingEvent.ID == event.ID {
+			eb.pendingQueue = append(eb.pendingQueue[:i], eb.pendingQueue[i+1:]...)
+			break
+		}
+	}
+	
 	atomic.AddInt64(&eb.completedCount, 1)
 	eb.taskMu.Unlock()
 
@@ -348,6 +372,7 @@ func (eb *eventBus) GetPendingTasks() []TaskInfo {
 			Data:      event.Data,
 		})
 	}
+	
 	return tasks
 }
 

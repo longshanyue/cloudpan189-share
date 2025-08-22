@@ -9,6 +9,7 @@ import (
 type Service interface {
 	RebuildStrm() gin.HandlerFunc
 	ClearMedia() gin.HandlerFunc
+	BusDetail() gin.HandlerFunc
 }
 
 type service struct {

@@ -1,6 +1,8 @@
 package advancedops
 
 import (
+	"fmt"
+	"go.uber.org/zap"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,9 +13,11 @@ import (
 func (s *service) ClearMedia() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		if err := bus.PublishMediaClearAllMedia(ctx); err != nil {
+			s.logger.Error("清理媒体文件失败", zap.Error(err))
+
 			ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
 				Code:    http.StatusInternalServerError,
-				Message: "清理媒体文件失败",
+				Message: fmt.Sprintf("清理媒体文件失败: %s", err.Error()),
 			})
 
 			return

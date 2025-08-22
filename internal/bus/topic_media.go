@@ -32,7 +32,7 @@ func (w *busWorker) doSubscribeTopicDeleteLinkVirtualFile() eventbus.Subscriptio
 
 func (w *busWorker) doSubscribeTopicMediaClearEmptyDir() eventbus.Subscription {
 	return w.bus.Subscribe(TopicMediaClearEmptyDir, func(ctx context.Context, data interface{}) error {
-		_, ok := data.(TopicMediaDeleteLinkFileRequest)
+		_, ok := data.(TopicMediaClearEmptyDirRequest)
 		if !ok {
 			return ErrRequestDataFormat
 		}
@@ -75,10 +75,6 @@ func PublishMediaAddStrmFile(ctx context.Context, fileID int64, path string) err
 
 func PublishMediaClearEmptyDir(ctx context.Context) error {
 	return singletonBusWork.bus.Publish(ctx, TopicMediaClearEmptyDir, TopicMediaClearEmptyDirRequest{})
-}
-
-func PublishMediaClearEmptyDirSync(ctx context.Context) error {
-	return singletonBusWork.bus.PublishSync(ctx, TopicMediaClearEmptyDir, TopicMediaClearEmptyDirRequest{})
 }
 
 func PublishMediaClearAllMedia(ctx context.Context, mediaTypes ...models.MediaType) error {
