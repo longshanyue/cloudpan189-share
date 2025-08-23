@@ -108,6 +108,10 @@ jobs:
           - goos: linux
             goarch: arm64
             suffix: linux-arm64
+          - goos: linux
+            goarch: arm
+            goarm: 7
+            suffix: linux-armv7a
           - goos: darwin
             goarch: amd64
             suffix: darwin-amd64
@@ -210,6 +214,13 @@ jobs:
           
           # 构建二进制文件（包含前端资源）
           echo "🔧 构建包含嵌入式前端资源的二进制文件..."
+          
+          # 设置 GOARM 环境变量（如果需要）
+          if [ "${{ matrix.goarm }}" != "" ]; then
+            export GOARM=${{ matrix.goarm }}
+            echo "🔧 设置 GOARM=${{ matrix.goarm }}"
+          fi
+          
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
             -ldflags="-s -w \
                       -X ${{ env.MODULE_NAME }}/configs.Commit=${{ env.VAR_COMMIT }} \
@@ -393,6 +404,7 @@ jobs:
             ### 🐧 Linux 系统
             - **AMD64 (x86_64)**: [`share-linux-amd64.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/share-linux-amd64.tar.gz)
             - **ARM64 (aarch64)**: [`share-linux-arm64.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/share-linux-arm64.tar.gz)
+            - **ARMv7a (32位ARM)**: [`share-linux-armv7a.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/share-linux-armv7a.tar.gz)
             
             ### 🍎 macOS 系统
             - **Intel (x86_64)**: [`share-darwin-amd64.tar.gz`](https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/share-darwin-amd64.tar.gz)
