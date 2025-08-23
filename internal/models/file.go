@@ -9,13 +9,17 @@ import (
 type OsType = string
 
 const (
-	OsTypeFolder         = "folder"
-	OsTypeFile           = "file"
-	OsTypeSubscribe      = "subscribe"
-	OsTypeSubscribeShare = "subscribe_share"
-	OsTypeShare          = "share"
-	OsTypeRealFile       = "real_file"
-	OsTypeStrmFile       = "strm_file"
+	OsTypeFolder   = "folder"
+	OsTypeFile     = "file"
+	OsTypeRealFile = "real_file"
+	OsTypeStrmFile = "strm_file"
+
+	OsTypeSubscribe         = "subscribe"
+	OsTypeSubscribeShare    = "subscribe_share"
+	OsTypeShare             = "share"
+	OsTypeCloudFolder       = "cloud_folder"
+	OsTypeCloudFamilyFolder = "cloud_family_folder"
+	OsTypeCloudFamilyFile   = "cloud_family_file"
 )
 
 type VirtualFile struct {

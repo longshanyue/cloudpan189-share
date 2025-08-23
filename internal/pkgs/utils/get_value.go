@@ -96,6 +96,14 @@ func String(value interface{}) string {
 	}
 }
 
+func GetString(data map[string]interface{}, key string) string {
+	if value, ok := data[key]; ok {
+		return String(value)
+	}
+
+	return ""
+}
+
 func StringSlice(value interface{}) []string {
 	switch v := value.(type) {
 	case []string:

@@ -6,11 +6,12 @@ import (
 	"crypto/md5"
 	"flag"
 	"fmt"
-	"github.com/joho/godotenv"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/joho/godotenv"
 
 	"github.com/glebarez/sqlite"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"

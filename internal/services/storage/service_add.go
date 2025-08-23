@@ -18,11 +18,13 @@ import (
 
 type addRequest struct {
 	LocalPath       string `json:"localPath" binding:"required"`
-	Protocol        string `json:"protocol" binding:"required,oneof=subscribe share"`
+	Protocol        string `json:"protocol" binding:"required,oneof=subscribe share person family"`
 	SubscribeUser   string `json:"subscribeUser"`
 	ShareCode       string `json:"shareCode"`
 	ShareAccessCode string `json:"shareAccessCode"`
 	CloudToken      int64  `json:"cloudToken"`
+	FileId          string `json:"fileId"`
+	FamilyId        string `json:"familyId"`
 }
 
 type addResponse struct {
@@ -34,69 +36,91 @@ func (s *service) Add() gin.HandlerFunc {
 		var req = new(addRequest)
 
 		if err := ctx.ShouldBindJSON(req); err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": err.Error(),
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: err.Error(),
 			})
+
+			return
 		}
 
 		paths, err := utils.SplitPath(req.LocalPath)
 		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": err.Error(),
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: err.Error(),
 			})
 
 			return
 		}
 
 		if len(paths) == 0 {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": "不允许挂载根路径",
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: "不允许挂载根路径",
 			})
 
 			return
 		}
 
 		if !utils.CheckIsPath(req.LocalPath) {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": "路径不合法，需要 / 开头的路径",
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: "路径不合法，需要 / 开头的路径",
 			})
 
 			return
 		}
 
 		if exits, err := s.checkExist(ctx, req.LocalPath); err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"code":    http.StatusInternalServerError,
-				"message": "添加失败",
+			ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+				Code:    http.StatusInternalServerError,
+				Message: "添加失败",
 			})
 
 			return
 		} else if exits {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": "路径已存在",
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: "路径已存在",
 			})
 
 			return
 		}
 
 		if req.Protocol == "subscribe" && req.SubscribeUser == "" {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": "subscribeUser is required",
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: "subscribeUser is required",
 			})
 
 			return
 		}
 
 		if req.Protocol == "share" && req.ShareCode == "" {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": "shareCode is required",
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: "shareCode is required",
+			})
+
+			return
+		}
+
+		if req.Protocol == "person" && (req.CloudToken == 0 ||
+			req.FileId == "") {
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: "cloudToken and fileId are required for person protocol",
+			})
+
+			return
+		}
+
+		if req.Protocol == "family" && (req.CloudToken == 0 ||
+			req.FamilyId == "" || req.FileId == "") {
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: "cloudToken, familyId and fileId are required for family protocol",
 			})
 
 			return
@@ -123,9 +147,9 @@ func (s *service) Add() gin.HandlerFunc {
 		if req.Protocol == "subscribe" {
 			_, err := client.New().GetUpResourceShare(ctx, req.SubscribeUser, 1, 30)
 			if err != nil {
-				ctx.JSON(http.StatusInternalServerError, gin.H{
-					"code":    http.StatusInternalServerError,
-					"message": err.Error(),
+				ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+					Code:    http.StatusInternalServerError,
+					Message: err.Error(),
 				})
 
 				return
@@ -146,27 +170,27 @@ func (s *service) Add() gin.HandlerFunc {
 				var clientErr = new(client.RespErr)
 				if errors.As(err, &clientErr) {
 					if clientErr.ResCode == "ShareAuditWaiting" {
-						ctx.JSON(http.StatusBadRequest, gin.H{
-							"code":    http.StatusBadRequest,
-							"message": "当前分享审核中，请稍后再试",
+						ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+							Code:    http.StatusBadRequest,
+							Message: "当前分享审核中，请稍后再试",
 						})
 
 						return
 					}
 				}
 
-				ctx.JSON(http.StatusInternalServerError, gin.H{
-					"code":    http.StatusInternalServerError,
-					"message": err.Error(),
+				ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+					Code:    http.StatusInternalServerError,
+					Message: err.Error(),
 				})
 
 				return
 			}
 
 			if resp.ShareId == 0 {
-				ctx.JSON(http.StatusInternalServerError, gin.H{
-					"code":    http.StatusInternalServerError,
-					"message": "分享查询失败",
+				ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+					Code:    http.StatusInternalServerError,
+					Message: "分享查询失败",
 				})
 
 				return
@@ -179,13 +203,55 @@ func (s *service) Add() gin.HandlerFunc {
 			m.Addition[consts.FileAdditionKeyShareType] = resp.ShareType
 			m.Addition[consts.FileAdditionKeyFileId] = resp.FileId
 			m.Addition[consts.FileAdditionKeyIsFolder] = resp.IsFolder
+		} else if req.Protocol == "person" || req.Protocol == "family" {
+			token, err := s.getCloudToken(ctx, req.CloudToken)
+			if err != nil {
+				ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+					Code:    http.StatusInternalServerError,
+					Message: err.Error(),
+				})
+
+				return
+			}
+
+			m.Addition[consts.FileAdditionKeyIsFolder] = true
+			m.Addition[consts.FileAdditionKeyFileId] = req.FileId
+
+			ct := client.New().WithToken(client.NewAuthToken(token.AccessToken, token.ExpiresIn))
+
+			if req.Protocol == "person" {
+				_, err = ct.ListFiles(ctx, client.String(req.FileId))
+				if err != nil {
+					ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+						Code:    http.StatusInternalServerError,
+						Message: err.Error(),
+					})
+
+					return
+				}
+
+				m.OsType = models.OsTypeCloudFolder
+			} else {
+				_, err = ct.FamilyListFiles(ctx, client.String(req.FamilyId), client.String(req.FileId))
+				if err != nil {
+					ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+						Code:    http.StatusInternalServerError,
+						Message: err.Error(),
+					})
+
+					return
+				}
+
+				m.Addition[consts.FileAdditionKeyFamilyId] = req.FamilyId
+				m.OsType = models.OsTypeCloudFamilyFolder
+			}
 		}
 
 		pid, err := s.findOrCreateAncestors(ctx, req.LocalPath)
 		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"code":    http.StatusInternalServerError,
-				"message": err.Error(),
+			ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+				Code:    http.StatusInternalServerError,
+				Message: err.Error(),
 			})
 
 			return
@@ -193,9 +259,9 @@ func (s *service) Add() gin.HandlerFunc {
 
 		m.ParentId = pid
 		if err = s.db.WithContext(ctx).Create(m).Error; err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"code":    http.StatusInternalServerError,
-				"message": "创建失败",
+			ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+				Code:    http.StatusInternalServerError,
+				Message: "创建失败",
 			})
 
 			return

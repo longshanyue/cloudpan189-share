@@ -49,6 +49,10 @@ func (w *busWorker) scanVirtualFile(ctx context.Context, rootId int64, deep bool
 			newFiles, err = w.getSubscribeShareFiles(ctx, file)
 		case models.OsTypeShare:
 			newFiles, err = w.getShareFiles(ctx, file)
+		case models.OsTypeCloudFolder:
+			newFiles, err = w.getCloudFiles(ctx, file)
+		case models.OsTypeCloudFamilyFolder:
+			newFiles, err = w.getCloudFamilyFiles(ctx, file)
 		default:
 			return nil
 		}

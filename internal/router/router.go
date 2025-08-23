@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/xxcheng123/cloudpan189-share/internal/services/storage"
+
 	"github.com/xxcheng123/cloudpan189-share/internal/services/advancedops"
 
 	"github.com/xxcheng123/cloudpan189-share/internal/services/usergroup"
@@ -16,7 +18,7 @@ import (
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/services/cloudtoken"
 	settingS "github.com/xxcheng123/cloudpan189-share/internal/services/setting"
-	"github.com/xxcheng123/cloudpan189-share/internal/services/storage"
+	storageBridge "github.com/xxcheng123/cloudpan189-share/internal/services/storage/bridge"
 	"github.com/xxcheng123/cloudpan189-share/internal/services/universalfs"
 	"github.com/xxcheng123/cloudpan189-share/internal/services/user"
 	"go.uber.org/zap"
@@ -31,13 +33,14 @@ func StartHTTPServer() error {
 	)
 
 	var (
-		userService        = user.NewService(db, logger)
-		cloudTokenService  = cloudtoken.NewService(db, logger)
-		settingService     = settingS.NewService(db, logger)
-		storageService     = storage.NewService(db, logger)
-		universalFsService = universalfs.NewService(db, logger)
-		userGroupService   = usergroup.NewService(db, logger)
-		advancedOpsService = advancedops.NewService(db, logger)
+		userService          = user.NewService(db, logger)
+		cloudTokenService    = cloudtoken.NewService(db, logger)
+		settingService       = settingS.NewService(db, logger)
+		storageService       = storage.NewService(db, logger)
+		storageBridgeService = storageBridge.NewService(db, logger)
+		universalFsService   = universalfs.NewService(db, logger)
+		userGroupService     = usergroup.NewService(db, logger)
+		advancedOpsService   = advancedops.NewService(db, logger)
 	)
 
 	openapiRouter := engine.Group("/api")
@@ -109,6 +112,12 @@ func StartHTTPServer() error {
 		storageRouter.GET("/list", storageService.List())
 		storageRouter.POST("/toggle_auto_scan", storageService.ToggleAutoScan())
 		storageRouter.POST("/scan_top", storageService.ScanTop())
+		storageBridgeRouter := storageRouter.Group("/bridge")
+		{
+			storageBridgeRouter.GET("/get_person_nodes", storageBridgeService.GetPersonNodes())
+			storageBridgeRouter.GET("/get_family_nodes", storageBridgeService.GetFamilyNodes())
+			storageBridgeRouter.GET("/family_file", storageBridgeService.FamilyList())
+		}
 
 		openapiRouter.POST("/storage/deep_refresh_file", userService.AuthMiddleware(models.PermissionBase), storageService.DeepRefreshFile())
 		openapiRouter.GET("/storage/file/search", userService.AuthMiddleware(models.PermissionBase), storageService.Search())

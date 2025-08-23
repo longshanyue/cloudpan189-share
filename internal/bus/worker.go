@@ -2,8 +2,9 @@ package bus
 
 import (
 	"context"
-	"github.com/bradenaw/juniper/xsync"
 	"sync"
+
+	"github.com/bradenaw/juniper/xsync"
 
 	"github.com/pkg/errors"
 	"github.com/xxcheng123/cloudpan189-interface/client"

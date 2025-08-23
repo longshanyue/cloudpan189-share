@@ -18,7 +18,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/samber/lo v1.51.0
 	github.com/tickstep/cloudpan189-api v0.1.0
-	github.com/xxcheng123/cloudpan189-interface v1.0.2
+	github.com/xxcheng123/cloudpan189-interface v1.0.3
 	github.com/xxcheng123/multistreamer v1.0.1
 	github.com/zeromicro/go-zero v1.8.5
 	go.uber.org/zap v1.27.0
