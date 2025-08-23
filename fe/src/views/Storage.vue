@@ -45,6 +45,10 @@
             <Icons name="refresh" size="1rem" class="btn-icon" />
             {{ loading ? '刷新中...' : '刷新' }}
           </button>
+          <button @click="showSmartParseModal = true" class="btn btn-warning">
+            <Icons name="link" size="1rem" class="btn-icon" />
+            批量解析
+          </button>
           <button @click="showAddModal = true" class="btn btn-primary">
             <Icons name="add" size="1rem" class="btn-icon" />
             添加存储
@@ -274,6 +278,165 @@
         </div>
       </div>
     </div>
+
+    <!-- 智能解析弹窗 -->
+    <div v-if="showSmartParseModal" class="modal-overlay" @click="closeSmartParseModal">
+      <div class="modal-content large" @click.stop>
+        <div class="modal-header">
+          <h3>智能解析批量导入</h3>
+          <button @click="closeSmartParseModal" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">
+              <div>粘贴天翼云盘链接</div>
+              <div style="font-size: 11px; color: #6b7280;">
+                支持天翼云盘分享链接和21cn订阅链接，可以一次性粘贴多个链接
+              </div>
+            </label>
+            <textarea 
+              v-model="parseInput" 
+              class="form-textarea" 
+              placeholder="请粘贴天翼云盘链接，支持多个链接同时解析...&#10;例如：&#10;https://cloud.189.cn/t/xxxxxx（访问码：1234）&#10;https://content.21cn.com/h5/subscrip/index.html#/pages/own-home/index?uuid=xxxxxxxx"
+              rows="6"
+            ></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">默认本地路径前缀</label>
+            <input 
+              v-model="defaultPathPrefix" 
+              type="text" 
+              class="form-input" 
+              placeholder="例如：/电影/2024年" 
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">默认云盘令牌（可选）</label>
+            <Select v-model="defaultCloudToken" :options="tokenOptions" placeholder="请选择令牌" />
+          </div>
+          <div class="parse-actions">
+            <button @click="parseLinks" class="btn btn-info" :disabled="parseLoading || !parseInput.trim()">
+              <Icons name="search" size="1rem" class="btn-icon" />
+              {{ parseLoading ? '解析中...' : '解析链接' }}
+            </button>
+          </div>
+          
+          <!-- 解析结果列表 -->
+          <div v-if="parsedResults.length > 0" class="parsed-results">
+            <h4>解析结果 ({{ parsedResults.length }}个)</h4>
+            <div class="results-table-container">
+              <table class="results-table">
+                <thead>
+                  <tr>
+                    <th width="50">
+                      <input 
+                        type="checkbox" 
+                        :checked="allResultsSelected" 
+                        @change="selectAllResults"
+                        class="checkbox"
+                      />
+                    </th>
+                    <th width="80">类型</th>
+                    <th width="180">建议名称</th>
+                    <th width="250">本地路径</th>
+                    <th width="150">云盘令牌</th>
+                    <th width="150">订阅用户ID</th>
+                    <th width="120">分享码</th>
+                    <th width="120">访问码</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(result, index) in parsedResults" :key="index" class="result-row">
+                    <td>
+                      <input 
+                        type="checkbox" 
+                        v-model="result.selected" 
+                        class="checkbox"
+                      />
+                    </td>
+                    <td>
+                      <span class="result-type" :class="`type-${result.type}`">
+                        {{ result.type === 'subscribe' ? '订阅' : '分享' }}
+                      </span>
+                    </td>
+                    <td>
+                      <span class="suggested-name" :title="result.suggestedName">
+                        {{ result.suggestedName }}
+                      </span>
+                    </td>
+                    <td>
+                      <input 
+                        v-model="result.localPath" 
+                        type="text" 
+                        class="table-input" 
+                        placeholder="请输入本地路径"
+                      />
+                    </td>
+                    <td>
+                      <Select 
+                        v-model="result.cloudToken" 
+                        :options="tokenOptions" 
+                        placeholder="选择令牌" 
+                        size="sm"
+                        class="table-select"
+                      />
+                    </td>
+                    <td>
+                      <input 
+                        v-if="result.type === 'subscribe'"
+                        v-model="result.subscribeUser" 
+                        type="text" 
+                        class="table-input" 
+                        placeholder="订阅用户ID"
+                      />
+                      <span v-else class="text-muted">-</span>
+                    </td>
+                    <td>
+                      <input 
+                        v-if="result.type === 'share'"
+                        v-model="result.shareCode" 
+                        type="text" 
+                        class="table-input" 
+                        readonly
+                      />
+                      <span v-else class="text-muted">-</span>
+                    </td>
+                    <td>
+                      <input 
+                        v-if="result.type === 'share'"
+                        v-model="result.accessCode" 
+                        type="text" 
+                        class="table-input" 
+                        placeholder="访问码（可选）"
+                      />
+                      <span v-else class="text-muted">-</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="closeSmartParseModal" class="btn btn-secondary">取消</button>
+          <button 
+            v-if="parsedResults.length > 0" 
+            @click="selectAllResults" 
+            class="btn btn-info"
+          >
+            {{ allResultsSelected ? '取消全选' : '全选' }}
+          </button>
+          <button 
+            v-if="selectedResultsCount > 0" 
+            @click="batchImportStorages" 
+            class="btn btn-primary" 
+            :disabled="batchImportLoading"
+          >
+            {{ batchImportLoading ? '导入中...' : `批量导入 (${selectedResultsCount})` }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -290,6 +453,7 @@ import { confirmDialog } from '@/utils/confirm'
 import Select from '@/components/Select.vue'
 import Pagination from '@/components/Pagination.vue'
 import { useSettingStore } from '@/stores/setting'
+import { parseMultipleCloudPan189Links, type CloudPan189ParseResult } from '@/utils/cloudpan189Parser'
 
 // Store 实例
 const settingStore = useSettingStore()
@@ -317,6 +481,25 @@ const selectedStorageIds = ref<Set<number>>(new Set())
 const showBatchBindModal = ref(false)
 const batchBindLoading = ref(false)
 const batchSelectedTokenId = ref('')
+
+// 智能解析相关
+const showSmartParseModal = ref(false)
+const parseInput = ref('')
+const defaultPathPrefix = ref('/电影')
+const defaultCloudToken = ref('')
+const parseLoading = ref(false)
+const batchImportLoading = ref(false)
+const parsedResults = ref<ParsedResult[]>([])
+
+// 解析结果接口
+interface ParsedResult extends CloudPan189ParseResult {
+  selected: boolean
+  suggestedName: string
+  localPath: string
+  cloudToken: string
+  subscribeUser?: string
+  shareCode?: string
+}
 
 // 新存储表单数据
 const newStorage = reactive({
@@ -349,6 +532,15 @@ const isAllSelected = computed(() => {
 
 const selectedCount = computed(() => {
   return selectedStorageIds.value.size
+})
+
+// 智能解析相关计算属性
+const allResultsSelected = computed(() => {
+  return parsedResults.value.length > 0 && parsedResults.value.every(result => result.selected)
+})
+
+const selectedResultsCount = computed(() => {
+  return parsedResults.value.filter(result => result.selected).length
 })
 
 // 获取存储列表
@@ -751,6 +943,168 @@ const handleSearch = () => {
   }, 500)
 }
 
+// 智能解析相关方法
+const closeSmartParseModal = () => {
+  showSmartParseModal.value = false
+  parseInput.value = ''
+  parsedResults.value = []
+  defaultPathPrefix.value = '/电影'
+  defaultCloudToken.value = ''
+}
+
+const parseLinks = async () => {
+  if (!parseInput.value.trim()) {
+    toast.warning('请输入要解析的链接')
+    return
+  }
+
+  try {
+    parseLoading.value = true
+    const results = parseMultipleCloudPan189Links(parseInput.value)
+    
+    if (results.length === 0) {
+      toast.warning('未找到有效的天翼云盘链接')
+      return
+    }
+
+    // 调用 preAdd 接口验证链接有效性并获取建议名称
+    const validResults: ParsedResult[] = []
+    const failedUrls: string[] = []
+    
+    for (const result of results) {
+      try {
+        const preAddData: any = {
+          protocol: result.type === 'subscribe' ? 'subscribe' : 'share'
+        }
+        
+        if (result.type === 'subscribe') {
+          preAddData.subscribeUser = result.shareId
+        } else if (result.type === 'share') {
+          preAddData.shareCode = result.shareId
+          if (result.accessCode) {
+            preAddData.shareAccessCode = result.accessCode
+          }
+        }
+        
+        if (defaultCloudToken.value) {
+          preAddData.cloudToken = Number(defaultCloudToken.value)
+        }
+        
+        const preAddResponse = await storageApi.preAdd(preAddData)
+        const suggestedName = preAddResponse.name || result.shareId
+        
+        validResults.push({
+          ...result,
+          selected: true,
+          suggestedName,
+          localPath: defaultPathPrefix.value ? `${defaultPathPrefix.value}/${suggestedName}` : `/${suggestedName}`,
+          cloudToken: defaultCloudToken.value,
+          subscribeUser: result.type === 'subscribe' ? result.shareId : '',
+          shareCode: result.type === 'share' ? result.shareId : ''
+        })
+      } catch (error) {
+        console.warn(`链接验证失败 (${result.originalUrl}):`, error)
+        failedUrls.push(result.originalUrl)
+      }
+    }
+
+    parsedResults.value = validResults
+    
+    if (validResults.length === 0) {
+      toast.error('所有链接都无效或解析失败')
+    } else if (failedUrls.length > 0) {
+      toast.warning(`成功解析 ${validResults.length} 个链接，${failedUrls.length} 个链接无效`)
+    } else {
+      toast.success(`成功解析 ${validResults.length} 个链接`)
+    }
+  } catch (error: any) {
+    console.error('解析链接失败:', error)
+    toast.error(error.message || '解析链接失败')
+  } finally {
+    parseLoading.value = false
+  }
+}
+
+const selectAllResults = () => {
+  const newSelectedState = !allResultsSelected.value
+  parsedResults.value.forEach(result => {
+    result.selected = newSelectedState
+  })
+}
+
+const batchImportStorages = async () => {
+  const selectedResults = parsedResults.value.filter(result => result.selected)
+  
+  if (selectedResults.length === 0) {
+    toast.warning('请选择要导入的存储')
+    return
+  }
+
+  // 验证必填字段
+  const invalidResults = selectedResults.filter(result => {
+    if (!result.localPath.trim()) return true
+    if (result.type === 'subscribe' && !result.subscribeUser?.trim()) return true
+    if (result.type === 'share' && !result.shareCode?.trim()) return true
+    return false
+  })
+
+  if (invalidResults.length > 0) {
+    toast.warning('请完善所有选中项的必填信息')
+    return
+  }
+
+  try {
+    batchImportLoading.value = true
+    let successCount = 0
+    let failedCount = 0
+    
+    // 逐个添加存储
+    for (const result of selectedResults) {
+      try {
+        const requestData: AddStorageRequest = {
+          localPath: result.localPath.trim(),
+          protocol: result.type === 'subscribe' ? 'subscribe' : 'share'
+        }
+
+        if (result.cloudToken) {
+          requestData.cloudToken = Number(result.cloudToken)
+        }
+
+        if (result.type === 'subscribe') {
+          requestData.subscribeUser = result.subscribeUser!.trim()
+        } else if (result.type === 'share') {
+          requestData.shareCode = result.shareCode!.trim()
+          if (result.accessCode?.trim()) {
+            requestData.shareAccessCode = result.accessCode.trim()
+          }
+        }
+
+        await storageApi.add(requestData)
+        successCount++
+      } catch (error) {
+        console.error(`添加存储失败 (${result.originalUrl}):`, error)
+        failedCount++
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`成功导入 ${successCount} 个存储，后台异步执行，如未显示，稍后刷新重新查看`)
+    }
+    
+    if (failedCount > 0) {
+      toast.warning(`${failedCount} 个存储导入失败`)
+    }
+
+    closeSmartParseModal()
+    fetchStorages()
+  } catch (error) {
+    console.error('批量导入存储失败:', error)
+    toast.error('批量导入存储失败')
+  } finally {
+    batchImportLoading.value = false
+  }
+}
+
 // 组件挂载时获取数据
 onMounted(() => {
   // 从localStorage恢复页面大小设置
@@ -872,6 +1226,15 @@ onMounted(() => {
 
 .btn-info:hover:not(:disabled) {
   background: #0284c7;
+}
+
+.btn-warning {
+  background: #f59e0b;
+  color: white;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #d97706;
 }
 
 .btn-sm {
@@ -1346,6 +1709,10 @@ onMounted(() => {
   max-width: 400px;
 }
 
+.modal-content.large {
+  max-width: 800px;
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -1473,6 +1840,201 @@ onMounted(() => {
   height: 16px;
   cursor: pointer;
   accent-color: #3b82f6;
+}
+
+/* 智能解析弹窗样式 */
+.form-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 120px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.parse-actions {
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.parsed-results {
+  margin-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 1.5rem;
+}
+
+.parsed-results h4 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+/* 解析结果表格样式 */
+.results-table-container {
+  max-height: 400px;
+  overflow-x: auto;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+}
+
+.results-table {
+  width: 100%;
+  min-width: 1100px;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  table-layout: fixed;
+}
+
+.results-table th {
+  background: #f9fafb;
+  padding: 0.75rem 0.5rem;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.results-table td {
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.result-row:hover {
+  background: #f9fafb;
+}
+
+.result-type {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.type-subscribe {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.type-share {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+
+
+.result-url {
+  font-size: 0.75rem;
+  color: #6b7280;
+  display: block;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-input {
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.table-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.table-input[readonly] {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.table-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.suggested-name {
+  font-weight: 500;
+  color: #374151;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.25rem 0;
+}
+
+.text-muted {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.form-row:last-child {
+  margin-bottom: 0;
+}
+
+.form-col {
+  flex: 1;
+}
+
+.form-label-sm {
+  display: block;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.form-input-sm {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.form-input-sm:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.form-input-sm[readonly] {
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 /* 响应式设计 */

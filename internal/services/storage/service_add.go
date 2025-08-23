@@ -192,7 +192,7 @@ func (s *service) Add() gin.HandlerFunc {
 		}
 
 		m.ParentId = pid
-		if err = s.db.Create(m).Error; err != nil {
+		if err = s.db.WithContext(ctx).Create(m).Error; err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{
 				"code":    http.StatusInternalServerError,
 				"message": "创建失败",
@@ -201,14 +201,12 @@ func (s *service) Add() gin.HandlerFunc {
 			return
 		}
 
-		if err = bus.PublishVirtualFileRefresh(ctx, pid, false); err != nil {
+		if err = bus.PublishVirtualFileRefresh(ctx, m.ID, false); err != nil {
 			ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
 				Code:    http.StatusInternalServerError,
 				Message: "创建成功，但是刷新文件失败",
 			})
 		}
-
-		//_ = shared.ScanJobPublish(shared.ScanJobTypeRefresh, m)
 
 		ctx.JSON(http.StatusOK, addResponse{ID: m.ID})
 	}

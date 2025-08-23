@@ -26,10 +26,23 @@ export interface Storage {
   fileScanStat?: FileScanStat
 }
 
+export interface PreAddStorageRequest {
+  protocol: string  // 目前只允许 subscribe、share
+  subscribeUser?: string // subscribe 时必填
+  shareCode?: string // share 时必填
+  shareAccessCode?: string // share 时可选
+  cloudToken?: number
+}
+
+export interface PreAddStorageResponse {
+  name: string
+  protocol: string
+}
+
 export interface AddStorageRequest {
   localPath: string
   protocol: string  // 目前只允许 subscribe、share
-  cloudToken?: number 
+  cloudToken?: number
   subscribeUser?: string // subscribe 时必填
   shareCode?: string // share 时必填
   shareAccessCode?: string // share 时必填
@@ -149,6 +162,11 @@ export interface ScanTopResponse {
 
 // 存储API
 export const storageApi = {
+  // 预添加存储（获取存储信息）
+  preAdd: (data: PreAddStorageRequest): Promise<PreAddStorageResponse> => {
+    return api.post('/storage/pre_add', data)
+  },
+
   // 添加存储
   add: (data: AddStorageRequest): Promise<AddStorageResponse> => {
     return api.post('/storage/add', data)

@@ -102,6 +102,7 @@ func StartHTTPServer() error {
 	storageRouter := openapiRouter.Group("/storage", userService.AuthMiddleware(models.PermissionAdmin))
 	{
 		storageRouter.POST("/add", storageService.Add())
+		storageRouter.POST("/pre_add", storageService.PreAdd())
 		storageRouter.POST("/delete", storageService.Delete())
 		storageRouter.POST("/modify_token", storageService.ModifyToken())
 		storageRouter.POST("/batch_bind_token", storageService.BatchBindToken())

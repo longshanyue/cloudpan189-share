@@ -11,6 +11,7 @@ import (
 
 type Service interface {
 	Add() gin.HandlerFunc
+	PreAdd() gin.HandlerFunc
 	Delete() gin.HandlerFunc
 	List() gin.HandlerFunc
 	ModifyToken() gin.HandlerFunc
