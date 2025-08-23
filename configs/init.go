@@ -114,7 +114,6 @@ func Init() {
 		new(models.UserGroup),
 		new(models.Group2File),
 		new(models.SettingDict),
-		new(models.SystemLog),
 		new(models.MediaFile),
 	); err != nil {
 		panic(err)
