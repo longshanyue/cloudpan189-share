@@ -10,7 +10,7 @@ OUTPUT_DIR=output
 BINARY_NAME=share
 DOCKER_IMAGE=$(PROJECT_NAME):latest
 
-.PHONY: build build-frontend build-backend clean clean-all
+.PHONY: build build-frontend build-backend build-multi-arch clean clean-all
 .PHONY: docker-build docker-run docker-stop docker-clean docker-logs
 .PHONY: dev test lint help
 
@@ -40,6 +40,56 @@ build-backend:
 		          -X $(MODULE_NAME)/configs.GitBranch=$(VAR_GIT_BRANCH)" \
 		-o $(OUTPUT_DIR)/$(BINARY_NAME) ./cmd/main.go
 	@echo "✅ Backend build completed: $(OUTPUT_DIR)/$(BINARY_NAME)"
+
+# 多架构构建
+build-multi-arch:
+	@echo "🔨 Building for multiple architectures..."
+	@mkdir -p $(OUTPUT_DIR)
+	go mod tidy
+	@echo "📦 Building for Linux AMD64..."
+	GOOS=linux GOARCH=amd64 go build \
+		-ldflags="-s -w -X $(MODULE_NAME)/configs.Commit=$(VAR_COMMIT) \
+		          -X $(MODULE_NAME)/configs.BuildDate=$(VAR_BUILD_DATE) \
+		          -X $(MODULE_NAME)/configs.GitSummary=$(VAR_GIT_SUMMARY) \
+		          -X $(MODULE_NAME)/configs.GitBranch=$(VAR_GIT_BRANCH)" \
+		-o $(OUTPUT_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/main.go
+	@echo "📦 Building for Linux ARM64..."
+	GOOS=linux GOARCH=arm64 go build \
+		-ldflags="-s -w -X $(MODULE_NAME)/configs.Commit=$(VAR_COMMIT) \
+		          -X $(MODULE_NAME)/configs.BuildDate=$(VAR_BUILD_DATE) \
+		          -X $(MODULE_NAME)/configs.GitSummary=$(VAR_GIT_SUMMARY) \
+		          -X $(MODULE_NAME)/configs.GitBranch=$(VAR_GIT_BRANCH)" \
+		-o $(OUTPUT_DIR)/$(BINARY_NAME)-linux-arm64 ./cmd/main.go
+	@echo "📦 Building for Linux ARMv7a..."
+	GOOS=linux GOARCH=arm GOARM=7 go build \
+		-ldflags="-s -w -X $(MODULE_NAME)/configs.Commit=$(VAR_COMMIT) \
+		          -X $(MODULE_NAME)/configs.BuildDate=$(VAR_BUILD_DATE) \
+		          -X $(MODULE_NAME)/configs.GitSummary=$(VAR_GIT_SUMMARY) \
+		          -X $(MODULE_NAME)/configs.GitBranch=$(VAR_GIT_BRANCH)" \
+		-o $(OUTPUT_DIR)/$(BINARY_NAME)-linux-armv7a ./cmd/main.go
+	@echo "📦 Building for Windows AMD64..."
+	GOOS=windows GOARCH=amd64 go build \
+		-ldflags="-s -w -X $(MODULE_NAME)/configs.Commit=$(VAR_COMMIT) \
+		          -X $(MODULE_NAME)/configs.BuildDate=$(VAR_BUILD_DATE) \
+		          -X $(MODULE_NAME)/configs.GitSummary=$(VAR_GIT_SUMMARY) \
+		          -X $(MODULE_NAME)/configs.GitBranch=$(VAR_GIT_BRANCH)" \
+		-o $(OUTPUT_DIR)/$(BINARY_NAME)-windows-amd64.exe ./cmd/main.go
+	@echo "📦 Building for macOS AMD64..."
+	GOOS=darwin GOARCH=amd64 go build \
+		-ldflags="-s -w -X $(MODULE_NAME)/configs.Commit=$(VAR_COMMIT) \
+		          -X $(MODULE_NAME)/configs.BuildDate=$(VAR_BUILD_DATE) \
+		          -X $(MODULE_NAME)/configs.GitSummary=$(VAR_GIT_SUMMARY) \
+		          -X $(MODULE_NAME)/configs.GitBranch=$(VAR_GIT_BRANCH)" \
+		-o $(OUTPUT_DIR)/$(BINARY_NAME)-darwin-amd64 ./cmd/main.go
+	@echo "📦 Building for macOS ARM64..."
+	GOOS=darwin GOARCH=arm64 go build \
+		-ldflags="-s -w -X $(MODULE_NAME)/configs.Commit=$(VAR_COMMIT) \
+		          -X $(MODULE_NAME)/configs.BuildDate=$(VAR_BUILD_DATE) \
+		          -X $(MODULE_NAME)/configs.GitSummary=$(VAR_GIT_SUMMARY) \
+		          -X $(MODULE_NAME)/configs.GitBranch=$(VAR_GIT_BRANCH)" \
+		-o $(OUTPUT_DIR)/$(BINARY_NAME)-darwin-arm64 ./cmd/main.go
+	@echo "✅ Multi-architecture build completed!"
+	@ls -la $(OUTPUT_DIR)/
 
 # 清理构建产物
 clean:
@@ -119,6 +169,14 @@ info:
 	@echo "  Summary: $(VAR_GIT_SUMMARY)"
 	@echo "  Branch:  $(VAR_GIT_BRANCH)"
 	@echo "  Output:  $(OUTPUT_DIR)/$(BINARY_NAME)"
+	@echo ""
+	@echo "🏗️ Supported Architectures:"
+	@echo "  - linux/amd64"
+	@echo "  - linux/arm64"
+	@echo "  - linux/arm/v7 (ARMv7a)"
+	@echo "  - windows/amd64"
+	@echo "  - darwin/amd64"
+	@echo "  - darwin/arm64"
 
 # 帮助信息
 help:
@@ -128,6 +186,7 @@ help:
 	@echo "  build           - Build frontend and backend"
 	@echo "  build-frontend  - Build frontend only"
 	@echo "  build-backend   - Build backend only"
+	@echo "  build-multi-arch - Build for multiple architectures"
 	@echo ""
 	@echo "🐳 Docker Commands:"
 	@echo "  docker-build    - Build Docker image"

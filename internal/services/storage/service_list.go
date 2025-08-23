@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"github.com/xxcheng123/cloudpan189-share/internal/shared"
+	"github.com/xxcheng123/cloudpan189-share/internal/bus"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -17,8 +17,8 @@ type listRequest struct {
 
 type FileItem struct {
 	*models.VirtualFile
-	LocalPath string          `json:"localPath"`
-	JobStat   *shared.JobStat `json:"jobStatus,omitempty"`
+	LocalPath    string            `json:"localPath"`
+	FileScanStat *bus.FileScanStat `json:"fileScanStat,omitempty"`
 }
 
 type listResponse struct {
@@ -80,20 +80,14 @@ func (s *service) List() gin.HandlerFunc {
 			return
 		}
 
-		statList := shared.ListStat()
-		jobMap := make(map[int64]*shared.JobStat)
-		for _, v := range statList {
-			jobMap[v.FileID] = v
-		}
-
 		var fileList = make([]*FileItem, 0)
 		for _, v := range list {
 			p, _ := s.getFullPath(ctx, v)
 
 			fileList = append(fileList, &FileItem{
-				VirtualFile: v,
-				LocalPath:   p,
-				JobStat:     jobMap[v.ID],
+				VirtualFile:  v,
+				LocalPath:    p,
+				FileScanStat: bus.FindScanFileStat(v.ID),
 			})
 		}
 

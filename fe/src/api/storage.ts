@@ -1,5 +1,11 @@
 import api from './index'
-import { JobStat } from './shared'
+
+// 文件扫描统计信息
+export interface FileScanStat {
+  fileId: number
+  waitCount: number
+  scannedCount: number
+}
 
 // 存储相关接口类型定义
 export interface Storage {
@@ -17,13 +23,26 @@ export interface Storage {
     share_access_code?: string
     disable_auto_scan?: boolean
   }
-  jobStatus?: JobStat
+  fileScanStat?: FileScanStat
+}
+
+export interface PreAddStorageRequest {
+  protocol: string  // 目前只允许 subscribe、share
+  subscribeUser?: string // subscribe 时必填
+  shareCode?: string // share 时必填
+  shareAccessCode?: string // share 时可选
+  cloudToken?: number
+}
+
+export interface PreAddStorageResponse {
+  name: string
+  protocol: string
 }
 
 export interface AddStorageRequest {
   localPath: string
   protocol: string  // 目前只允许 subscribe、share
-  cloudToken?: number 
+  cloudToken?: number
   subscribeUser?: string // subscribe 时必填
   shareCode?: string // share 时必填
   shareAccessCode?: string // share 时必填
@@ -127,10 +146,6 @@ export interface SearchResponse {
   data: SearchItem[]
 }
 
-export interface ClearRealFileResponse {
-  message: string
-}
-
 export interface ToggleAutoScanRequest {
   id: number
   disableAutoScan: boolean
@@ -147,6 +162,11 @@ export interface ScanTopResponse {
 
 // 存储API
 export const storageApi = {
+  // 预添加存储（获取存储信息）
+  preAdd: (data: PreAddStorageRequest): Promise<PreAddStorageResponse> => {
+    return api.post('/storage/pre_add', data)
+  },
+
   // 添加存储
   add: (data: AddStorageRequest): Promise<AddStorageResponse> => {
     return api.post('/storage/add', data)
@@ -180,11 +200,6 @@ export const storageApi = {
   // 搜索文件
   search: (params: SearchRequest): Promise<SearchResponse> => {
     return api.get('/storage/file/search', { params })
-  },
-
-  // 清空本地真实存储
-  clearRealFile: (): Promise<ClearRealFileResponse> => {
-    return api.post('/storage/clear_real_file')
   },
 
   // 切换自动扫描设置

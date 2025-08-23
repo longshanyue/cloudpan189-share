@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/xxcheng123/cloudpan189-share/internal/services/advancedops"
+
 	"github.com/xxcheng123/cloudpan189-share/internal/services/usergroup"
 
 	"github.com/gin-gonic/gin"
@@ -35,6 +37,7 @@ func StartHTTPServer() error {
 		storageService     = storage.NewService(db, logger)
 		universalFsService = universalfs.NewService(db, logger)
 		userGroupService   = usergroup.NewService(db, logger)
+		advancedOpsService = advancedops.NewService(db, logger)
 	)
 
 	openapiRouter := engine.Group("/api")
@@ -90,7 +93,8 @@ func StartHTTPServer() error {
 		settingRouter.POST("/modify_multiple_stream_chunk_size", settingService.ModifyMultipleStreamChunkSize())
 		settingRouter.POST("/toggle_strm_file_enable", settingService.ToggleStrmFileEnable())
 		settingRouter.POST("/modify_strm_support_file_ext_list", settingService.ModifyStrmSupportFileExtList())
-		settingRouter.POST("/toggle_file_writable", settingService.ToggleFileWritable())
+		settingRouter.POST("/toggle_link_file_auto_delete", settingService.ToggleLinkFileAutoDelete())
+		settingRouter.POST("/modify_strm_base_url", settingService.ModifyStrmBaseURL())
 
 		openapiRouter.POST("/setting/init_system", settingService.InitSystem())
 	}
@@ -98,16 +102,23 @@ func StartHTTPServer() error {
 	storageRouter := openapiRouter.Group("/storage", userService.AuthMiddleware(models.PermissionAdmin))
 	{
 		storageRouter.POST("/add", storageService.Add())
+		storageRouter.POST("/pre_add", storageService.PreAdd())
 		storageRouter.POST("/delete", storageService.Delete())
 		storageRouter.POST("/modify_token", storageService.ModifyToken())
 		storageRouter.POST("/batch_bind_token", storageService.BatchBindToken())
 		storageRouter.GET("/list", storageService.List())
-		storageRouter.POST("/clear_real_file", storageService.ClearRealFile())
 		storageRouter.POST("/toggle_auto_scan", storageService.ToggleAutoScan())
 		storageRouter.POST("/scan_top", storageService.ScanTop())
 
 		openapiRouter.POST("/storage/deep_refresh_file", userService.AuthMiddleware(models.PermissionBase), storageService.DeepRefreshFile())
 		openapiRouter.GET("/storage/file/search", userService.AuthMiddleware(models.PermissionBase), storageService.Search())
+	}
+
+	advancedOpsRouter := openapiRouter.Group("/advanced_ops", userService.AuthMiddleware(models.PermissionAdmin))
+	{
+		advancedOpsRouter.POST("/rebuild_strm", advancedOpsService.RebuildStrm())
+		advancedOpsRouter.POST("/clear_media", advancedOpsService.ClearMedia())
+		advancedOpsRouter.GET("/bus_detail", advancedOpsService.BusDetail())
 	}
 
 	{
@@ -140,18 +151,6 @@ func StartHTTPServer() error {
 				"dav",
 				handler,
 			},
-			{
-				"/strm_dav/*path",
-				"/strm_dav",
-				"strm_dav",
-				handler,
-			},
-			{
-				"/strm_dav",
-				"/strm_dav",
-				"strm_dav",
-				handler,
-			},
 		}
 
 		for _, method := range davMethods {
@@ -160,9 +159,6 @@ func StartHTTPServer() error {
 			}
 		}
 
-		for _, r := range registry {
-			engine.Handle(http.MethodPut, r.path, append(r.handlers, universalFsService.Put())...)
-		}
 		for _, r := range registry {
 			engine.Handle(http.MethodDelete, r.path, append(r.handlers, universalFsService.Delete())...)
 		}

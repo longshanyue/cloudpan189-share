@@ -4,13 +4,15 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/xxcheng123/cloudpan189-share/internal/bus"
+	"github.com/xxcheng123/cloudpan189-share/internal/types"
+
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"github.com/xxcheng123/cloudpan189-interface/client"
 	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
-	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"gorm.io/datatypes"
 )
 
@@ -190,7 +192,7 @@ func (s *service) Add() gin.HandlerFunc {
 		}
 
 		m.ParentId = pid
-		if err = s.db.Create(m).Error; err != nil {
+		if err = s.db.WithContext(ctx).Create(m).Error; err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{
 				"code":    http.StatusInternalServerError,
 				"message": "创建失败",
@@ -199,7 +201,12 @@ func (s *service) Add() gin.HandlerFunc {
 			return
 		}
 
-		_ = shared.ScanJobPublish(shared.ScanJobTypeRefresh, m)
+		if err = bus.PublishVirtualFileRefresh(ctx, m.ID, false); err != nil {
+			ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+				Code:    http.StatusInternalServerError,
+				Message: "创建成功，但是刷新文件失败",
+			})
+		}
 
 		ctx.JSON(http.StatusOK, addResponse{ID: m.ID})
 	}

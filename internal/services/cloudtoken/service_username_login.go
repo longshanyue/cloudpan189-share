@@ -2,12 +2,13 @@ package cloudtoken
 
 import (
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/tickstep/cloudpan189-api/cloudpan"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"go.uber.org/zap"
-	"net/http"
-	"time"
 )
 
 type usernameLoginRequest struct {

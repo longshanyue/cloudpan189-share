@@ -1,17 +1,17 @@
 package universalfs
 
 import (
+	"net/http"
+
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"github.com/xxcheng123/cloudpan189-share/internal/consts"
 	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/utils"
-	"github.com/xxcheng123/cloudpan189-share/internal/shared"
 	"github.com/xxcheng123/cloudpan189-share/internal/types"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"net/http"
 )
 
 func (s *service) BaseMiddleware() gin.HandlerFunc {
@@ -167,26 +167,8 @@ func (s *service) DavMiddleware() gin.HandlerFunc {
 			ctx.Next()
 		case "GET", "HEAD", "POST":
 			ctx.Next()
-		case "PUT", "DELETE":
-			if !shared.FileWritable {
-				s.logger.Warn("文件写入功能已禁用", zap.String("method", ctx.Request.Method), zap.String("path", ctx.Request.URL.Path))
-
-				ctx.JSON(http.StatusMethodNotAllowed, types.ErrResponse{
-					Code:    http.StatusMethodNotAllowed,
-					Message: "文件写入功能已禁用",
-				})
-
-				ctx.Abort()
-
-				return
-			}
-
-			ctx.Next()
 		case "OPTIONS":
 			allow := "OPTIONS, HEAD, GET, POST, PROPFIND"
-			if shared.FileWritable {
-				allow += ", PUT, DELETE"
-			}
 
 			ctx.Header("Allow", allow)
 			// http://www.webdav.org/specs/rfc4918.html#dav.compliance.classes

@@ -1,5 +1,5 @@
 <template>
-  <Layout>
+  <div>
     <!-- 用户组管理主卡片 -->
     <PageCard title="用户组管理" subtitle="用户组用于控制用户可以看到哪些文件，默认用户组默认存在且无法查看删除，默认用户组可看到所有文件。">
       <SectionDivider />
@@ -171,12 +171,11 @@
         </div>
       </div>
     </div>
-  </Layout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, reactive } from 'vue'
-import Layout from '@/components/Layout.vue'
 import Icons from '@/components/Icons.vue'
 import Pagination from '@/components/Pagination.vue'
 import PageCard from '@/components/PageCard.vue'
@@ -423,8 +422,8 @@ const confirmManageStoragePermissions = async () => {
       fileIds: boundStorageIds.value
     }
     
-    const result = await userGroupApi.batchBindFiles(bindData)
-    toast.success(`存储权限配置成功：绑定 ${result.bindCount} 个存储`)
+    await userGroupApi.batchBindFiles(bindData)
+    toast.success(`存储权限配置成功`)
     closeStorageModal()
   } catch (error: any) {
     console.error('配置存储权限失败:', error)

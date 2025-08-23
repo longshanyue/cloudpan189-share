@@ -10,8 +10,8 @@ import (
 )
 
 type toggleAutoScanRequest struct {
-	ID               int64 `json:"id" binding:"required"`
-	DisableAutoScan  bool  `json:"disableAutoScan"`
+	ID              int64 `json:"id" binding:"required"`
+	DisableAutoScan bool  `json:"disableAutoScan"`
 }
 
 func (s *service) ToggleAutoScan() gin.HandlerFunc {

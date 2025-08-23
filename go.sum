@@ -1,5 +1,7 @@
 filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
 filippo.io/edwards25519 v1.1.0/go.mod h1:BxyFTGdWcka3PhytdK4V28tE5sGfRvvvRV7EaN4VDT4=
+github.com/bradenaw/juniper v0.15.3 h1:RHIAMEDTpvmzV1wg1jMAHGOoI2oJUSPx3lxRldXnFGo=
+github.com/bradenaw/juniper v0.15.3/go.mod h1:UX4FX57kVSaDp4TPqvSjkAAewmRFAfXf27BOs5z9dq8=
 github.com/bytedance/gopkg v0.1.2 h1:8o2feYuxknDpN+O7kPwvSXfMEKfYvJYiA2K7aonoMEQ=
 github.com/bytedance/gopkg v0.1.2/go.mod h1:576VvJ+eJgyCzdjS+c4+77QF3p7ubbtiKARP3TxducM=
 github.com/bytedance/sonic v1.11.6 h1:oUp34TzMlL+OY1OUWxHqsdkgC/Zfc85zGqw9siXjrc0=
@@ -77,6 +79,8 @@ github.com/jinzhu/inflection v1.0.0 h1:K317FqzuhWc8YvSVlFMCCUb36O/S9MCKRDI7QkRKD
 github.com/jinzhu/inflection v1.0.0/go.mod h1:h+uFLlag+Qp1Va5pdKtLDYj+kHp5pxUVkryuEj+Srlc=
 github.com/jinzhu/now v1.1.5 h1:/o9tlHleP7gOFmsnYNz3RGnqzefHA47wQpKrrdTIwXQ=
 github.com/jinzhu/now v1.1.5/go.mod h1:d3SSVoowX0Lcu0IBviAWJpolVfI5UJVZZ7cO71lE/z8=
+github.com/joho/godotenv v1.5.1 h1:7eLL/+HRGLY0ldzfGMeQkb7vMd0as4CfYvUVzLqw0N0=
+github.com/joho/godotenv v1.5.1/go.mod h1:f4LDr5Voq0i2e/R5DDNOoa2zzDfwtkZa6DnEwAbqwq4=
 github.com/json-iterator/go v1.1.10/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
@@ -148,8 +152,8 @@ github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS
 github.com/twitchyliquid64/golang-asm v0.15.1/go.mod h1:a1lVb/DtPvCB8fslRZhAngC2+aY1QWCk3Cedj/Gdt08=
 github.com/ugorji/go/codec v1.2.12 h1:9LC83zGrHhuUA9l16C9AHXAqEV/2wBQ4nkvumAE65EE=
 github.com/ugorji/go/codec v1.2.12/go.mod h1:UNopzCgEMSXjBc6AOMqYvWC1ktqTAfzJZUZgYf6w6lg=
-github.com/xxcheng123/cloudpan189-interface v1.0.1 h1:ZYiso8ZWoep8vtYNUClPogZBR8OV1Mw7Tk3lbO6nBLI=
-github.com/xxcheng123/cloudpan189-interface v1.0.1/go.mod h1:HhJAEtxYzq9dZxprvOBaIdBkwKT7iY+cBiJ4/BsRntw=
+github.com/xxcheng123/cloudpan189-interface v1.0.2 h1:vYN4XAAkfFvWPsGpkq4ek8CKUxReZZN6AeEdS7K8fZE=
+github.com/xxcheng123/cloudpan189-interface v1.0.2/go.mod h1:HhJAEtxYzq9dZxprvOBaIdBkwKT7iY+cBiJ4/BsRntw=
 github.com/xxcheng123/multistreamer v1.0.1 h1:xjwyYMtaTzq7uxcZleu88ofEGmiE0AEpaAydePEPGBs=
 github.com/xxcheng123/multistreamer v1.0.1/go.mod h1:o86TuPGDbxqBrd2NIEr1uv67yFhrQUVh/FPO0uGvyTs=
 github.com/zeromicro/go-zero v1.8.5 h1:YkdQhYllE+BPOrxcni0oCewebs7qHfXvjN9glnpcmJQ=

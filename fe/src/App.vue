@@ -7,7 +7,7 @@
           由 cloudpan189-share 驱动
         </a>
         <span class="footer-separator">|</span>
-        <router-link to="/@dashboard" class="footer-link">
+        <router-link to="/@admin/dashboard" class="footer-link">
           管理
         </router-link>
       </div>
@@ -67,6 +67,7 @@ body {
   left: 50%;
   width: 100%;
   z-index: 999;
+  max-height: 100px;
 }
 
 .footer-content {

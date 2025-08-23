@@ -1,5 +1,5 @@
 <template>
-  <Layout>
+  <div>
     <!-- 仪表盘主卡片 -->
     <PageCard :title="'仪表盘'" :subtitle="getGreeting() + '，' + authStore.user?.username + '！'">
       <SectionDivider />
@@ -79,16 +79,16 @@
                   <Icons name="folder" size="1.2rem" />
                 </div>
                 <div class="dav-info">
-                  <h4 class="dav-title">普通 DAV</h4>
-                  <p class="dav-desc">访问时忽略自动生成的 STRM 文件</p>
-                  <p class="dav-hint">适用于需要查看原始文件的场景</p>
+                  <h4 class="dav-title">WebDAV</h4>
+                  <p class="dav-desc">通过 WebDAV 协议访问文件系统</p>
+                  <p class="dav-hint">适用于各种支持 WebDAV 的客户端</p>
                 </div>
               </div>
               <div class="dav-url">
-                <input 
-                  type="text" 
-                  :value="getDavUrl('/dav')" 
-                  readonly 
+                <input
+                  type="text"
+                  :value="getDavUrl('/dav')"
+                  readonly
                   class="url-input"
                   @click="selectText"
                 />
@@ -97,41 +97,16 @@
                 </button>
               </div>
             </div>
-            <div class="dav-item">
-              <div class="dav-header">
-                <div class="dav-icon strm-icon">
-                  <Icons name="file" size="1.2rem" />
-                </div>
-                <div class="dav-info">
-                  <h4 class="dav-title">STRM DAV</h4>
-                  <p class="dav-desc">优先显示 STRM 文件，否则显示原文件</p>
-                  <p class="dav-hint">如果没有生成 STRM 文件，可在系统设置中开启或重建</p>
-                </div>
-              </div>
-              <div class="dav-url">
-                <input 
-                  type="text" 
-                  :value="getDavUrl('/strm_dav')" 
-                  readonly 
-                  class="url-input"
-                  @click="selectText"
-                />
-                <button @click="copyToClipboard(getDavUrl('/strm_dav'))" class="copy-btn">
-                  <Icons name="copy" size="0.9rem" />
-                </button>
-              </div>
-            </div>
           </div>
         </div>
     </PageCard>
-  </Layout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSettingStore } from '@/stores/setting'
-import Layout from '@/components/Layout.vue'
 import Icons from '@/components/Icons.vue'
 import PageCard from '@/components/PageCard.vue'
 import SectionDivider from '@/components/SectionDivider.vue'
@@ -440,11 +415,6 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.dav-icon.strm-icon {
-  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
-  border-color: #10b981;
-  color: #047857;
-}
 
 .dav-info {
   flex: 1;

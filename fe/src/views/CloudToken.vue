@@ -1,55 +1,55 @@
 <template>
-  <Layout>
+  <div>
     <!-- 令牌管理主卡片 -->
     <PageCard title="令牌管理" subtitle="管理云盘189的访问令牌，用于获取下载链接">
       <SectionDivider />
-        
-        <!-- 操作区域 -->
-        <div class="action-section">
-          <button class="action-btn primary" @click="handleAddToken" :disabled="loading">
-            <Icons name="add" size="1rem" class="btn-icon" />
-            添加新令牌
-          </button>
-        </div>
-        
-        <SectionDivider />
-        
-        <!-- 令牌列表 -->
-        <SubsectionTitle title="令牌列表" />
-        <div class="token-list" v-if="tokens.length > 0">
-          <div class="token-item" v-for="token in tokens" :key="token.id">
-            <div class="token-info">
-              <div class="token-name">{{ token.name }}</div>
-              <div class="token-meta">
-                <span class="token-status" :class="getStatusClass(token.status)">{{ getStatusText(token.status) }}</span>
-                <span class="token-login-type" :class="getLoginTypeClass(token.loginType)">{{ getLoginTypeText(token.loginType) }}</span>
-                <span v-if="token.status === 1" class="token-expiry" :class="getExpiryClass(token.expiresIn)">{{ formatExpiry(token.expiresIn) }}</span>
-                <span class="token-date">创建于 {{ formatDate(token.createdAt) }}</span>
-                <span v-if="token.loginType ===2" style="color: #999; font-size: 12px">密码登录将在令牌有效期还剩7天时尝试更新</span>
-              </div>
-            </div>
-            <div class="token-actions">
-              <button class="action-btn secondary" @click="handleEditTokenName(token)" :disabled="loading">
-                修改名称
-              </button>
-              <button class="action-btn primary" @click="handleUpdateToken(token)" :disabled="loading">
-                更新令牌
-              </button>
-              <button class="action-btn danger" @click="handleDeleteToken(token)" :disabled="loading">
-                删除
-              </button>
+
+      <!-- 操作区域 -->
+      <div class="action-section">
+        <button class="action-btn primary" @click="handleAddToken" :disabled="loading">
+          <Icons name="add" size="1rem" class="btn-icon" />
+          添加新令牌
+        </button>
+      </div>
+
+      <SectionDivider />
+
+      <!-- 令牌列表 -->
+      <SubsectionTitle title="令牌列表" />
+      <div class="token-list" v-if="tokens.length > 0">
+        <div class="token-item" v-for="token in tokens" :key="token.id">
+          <div class="token-info">
+            <div class="token-name">{{ token.name }}</div>
+            <div class="token-meta">
+              <span class="token-status" :class="getStatusClass(token.status)">{{ getStatusText(token.status) }}</span>
+              <span class="token-login-type" :class="getLoginTypeClass(token.loginType)">{{ getLoginTypeText(token.loginType) }}</span>
+              <span v-if="token.status === 1" class="token-expiry" :class="getExpiryClass(token.expiresIn)">{{ formatExpiry(token.expiresIn) }}</span>
+              <span class="token-date">创建于 {{ formatDate(token.createdAt) }}</span>
+              <span v-if="token.loginType ===2" style="color: #999; font-size: 12px">密码登录将在令牌有效期还剩7天时尝试更新</span>
             </div>
           </div>
+          <div class="token-actions">
+            <button class="action-btn secondary" @click="handleEditTokenName(token)" :disabled="loading">
+              修改名称
+            </button>
+            <button class="action-btn primary" @click="handleUpdateToken(token)" :disabled="loading">
+              更新令牌
+            </button>
+            <button class="action-btn danger" @click="handleDeleteToken(token)" :disabled="loading">
+              删除
+            </button>
+          </div>
         </div>
-        
-        <!-- 空状态 -->
-        <div class="empty-state" v-else>
-          <Icons name="tokens" size="3rem" class="empty-icon" />
-          <div class="empty-title">暂无令牌</div>
-          <div class="empty-desc">点击上方按钮添加您的第一个云盘令牌</div>
-        </div>
+      </div>
+
+      <!-- 空状态 -->
+      <div class="empty-state" v-else>
+        <Icons name="tokens" size="3rem" class="empty-icon" />
+        <div class="empty-title">暂无令牌</div>
+        <div class="empty-desc">点击上方按钮添加您的第一个云盘令牌</div>
+      </div>
     </PageCard>
-    
+
     <!-- 添加/编辑令牌弹窗 -->
     <div class="modal-overlay" v-if="showModal" @click="closeModal">
       <div class="modal-content" @click.stop>
@@ -57,58 +57,58 @@
           <h3 class="modal-title">{{ isEditing ? '编辑令牌' : '添加令牌' }}</h3>
           <button class="modal-close" @click="closeModal">✕</button>
         </div>
-        
+
         <div class="modal-body">
           <!-- 登录方式选择 -->
           <div class="login-type-selection" v-if="!selectedLoginType">
             <div class="login-type-title">选择登录方式</div>
             <div class="login-type-options">
               <div class="login-type-option" @click="selectLoginType(1)">
-                 <div class="login-type-icon qr-icon">
-                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                     <rect x="3" y="3" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2" fill="none"/>
-                     <rect x="13" y="3" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2" fill="none"/>
-                     <rect x="3" y="13" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2" fill="none"/>
-                     <rect x="5" y="5" width="4" height="4" fill="currentColor"/>
-                     <rect x="15" y="5" width="4" height="4" fill="currentColor"/>
-                     <rect x="5" y="15" width="4" height="4" fill="currentColor"/>
-                     <rect x="13" y="13" width="2" height="2" fill="currentColor"/>
-                     <rect x="17" y="13" width="2" height="2" fill="currentColor"/>
-                     <rect x="19" y="15" width="2" height="2" fill="currentColor"/>
-                     <rect x="15" y="17" width="2" height="2" fill="currentColor"/>
-                     <rect x="13" y="19" width="2" height="2" fill="currentColor"/>
-                     <rect x="17" y="19" width="2" height="2" fill="currentColor"/>
-                     <rect x="19" y="19" width="2" height="2" fill="currentColor"/>
-                   </svg>
-                 </div>
-                 <div class="login-type-name">扫码登录</div>
-                 <div class="login-type-desc">使用天翼云盘APP扫描二维码</div>
-               </div>
-               <div class="login-type-option" @click="selectLoginType(2)">
-                 <div class="login-type-icon pwd-icon">
-                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                     <rect x="3" y="11" width="18" height="10" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none"/>
-                     <circle cx="12" cy="16" r="1" fill="currentColor"/>
-                     <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                   </svg>
-                 </div>
-                 <div class="login-type-name">密码登录</div>
-                 <div class="login-type-desc">使用用户名和密码登录</div>
-               </div>
+                <div class="login-type-icon qr-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="3" y="3" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <rect x="13" y="3" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <rect x="3" y="13" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <rect x="5" y="5" width="4" height="4" fill="currentColor"/>
+                    <rect x="15" y="5" width="4" height="4" fill="currentColor"/>
+                    <rect x="5" y="15" width="4" height="4" fill="currentColor"/>
+                    <rect x="13" y="13" width="2" height="2" fill="currentColor"/>
+                    <rect x="17" y="13" width="2" height="2" fill="currentColor"/>
+                    <rect x="19" y="15" width="2" height="2" fill="currentColor"/>
+                    <rect x="15" y="17" width="2" height="2" fill="currentColor"/>
+                    <rect x="13" y="19" width="2" height="2" fill="currentColor"/>
+                    <rect x="17" y="19" width="2" height="2" fill="currentColor"/>
+                    <rect x="19" y="19" width="2" height="2" fill="currentColor"/>
+                  </svg>
+                </div>
+                <div class="login-type-name">扫码登录</div>
+                <div class="login-type-desc">使用天翼云盘APP扫描二维码</div>
+              </div>
+              <div class="login-type-option" @click="selectLoginType(2)">
+                <div class="login-type-icon pwd-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="3" y="11" width="18" height="10" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <circle cx="12" cy="16" r="1" fill="currentColor"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                  </svg>
+                </div>
+                <div class="login-type-name">密码登录</div>
+                <div class="login-type-desc">使用用户名和密码登录</div>
+              </div>
             </div>
           </div>
-          
+
           <!-- 二维码显示区域 -->
           <div class="qrcode-section" v-if="selectedLoginType === 1 && qrCodeData">
             <div class="qrcode-container">
               <div class="qrcode-display" v-if="qrCodeData.qrCodeUrl">
-                 <img :src="qrCodeData.qrCodeUrl" alt="二维码" class="qrcode-image" />
-                 <div class="qrcode-text">请使用天翼云盘APP扫描二维码</div>
-                 <div v-if="scanTimeLeft > 0 && scanTimeLeft < 120" class="qrcode-countdown">
-                   请在 {{ Math.floor(scanTimeLeft / 60) }}分{{ scanTimeLeft % 60 }}秒 内完成扫码
-                 </div>
-                 <div class="qrcode-uuid">{{ qrCodeData.uuid }}</div>
-               </div>
+                <img :src="qrCodeData.qrCodeUrl" alt="二维码" class="qrcode-image" />
+                <div class="qrcode-text">请使用天翼云盘APP扫描二维码</div>
+                <div v-if="scanTimeLeft > 0 && scanTimeLeft < 120" class="qrcode-countdown">
+                  请在 {{ Math.floor(scanTimeLeft / 60) }}分{{ scanTimeLeft % 60 }}秒 内完成扫码
+                </div>
+                <div class="qrcode-uuid">{{ qrCodeData.uuid }}</div>
+              </div>
               <div class="qrcode-placeholder" v-else>
                 <div class="qrcode-icon">
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -137,7 +137,7 @@
               </div>
             </div>
           </div>
-          
+
           <!-- 扫码登录未生成二维码时的提示 -->
           <div v-if="selectedLoginType === 1 && !qrCodeData" class="qrcode-placeholder-empty">
             <div class="empty-qr-icon">
@@ -159,34 +159,34 @@
             </div>
             <div class="empty-qr-text">{{ isEditing ? '重新生成二维码进行授权' : '点击下方按钮生成二维码开始授权' }}</div>
           </div>
-          
+
           <!-- 密码登录表单 -->
           <div class="password-login-section" v-if="selectedLoginType === 2 || (isEditing && showPasswordForm)">
             <div v-if="formReady" class="password-form">
               <div class="form-group">
                 <label class="form-label">用户名</label>
-                <input 
-                  v-model="username" 
-                  type="text" 
-                  placeholder="请输入天翼云盘用户名"
-                  class="form-input"
-                  autocomplete="off"
-                  :name="'username_' + randomId"
-                  readonly
-                  @focus="removeReadonly"
+                <input
+                    v-model="username"
+                    type="text"
+                    placeholder="请输入天翼云盘用户名"
+                    class="form-input"
+                    autocomplete="off"
+                    :name="'username_' + randomId"
+                    readonly
+                    @focus="removeReadonly"
                 />
               </div>
               <div class="form-group">
                 <label class="form-label">密码</label>
-                <input 
-                  v-model="password" 
-                  type="password" 
-                  placeholder="请输入密码"
-                  class="form-input"
-                  autocomplete="new-password"
-                  :name="'password_' + randomId"
-                  readonly
-                  @focus="removeReadonly"
+                <input
+                    v-model="password"
+                    type="password"
+                    placeholder="请输入密码"
+                    class="form-input"
+                    autocomplete="new-password"
+                    :name="'password_' + randomId"
+                    readonly
+                    @focus="removeReadonly"
                 />
               </div>
             </div>
@@ -195,45 +195,45 @@
             </div>
           </div>
         </div>
-        
+
         <div class="modal-footer">
           <button class="modal-btn secondary" @click="closeModal" :disabled="loading">
             取消
           </button>
-          
+
           <!-- 返回按钮（在选择了登录方式后显示） -->
-          <button 
-            v-if="selectedLoginType && !isEditing" 
-            class="modal-btn secondary" 
-            @click="goBack" 
-            :disabled="loading"
+          <button
+              v-if="selectedLoginType && !isEditing"
+              class="modal-btn secondary"
+              @click="goBack"
+              :disabled="loading"
           >
             返回
           </button>
-          
+
           <!-- 扫码登录按钮 -->
-          <button 
-            v-if="selectedLoginType === 1 || (isEditing && !showPasswordForm)" 
-            class="modal-btn primary" 
-            @click="qrCodeData ? (isScanning ? stopQrcodeCheck() : startQrcodeCheck()) : handleGenerateQrcode()" 
-            :disabled="loading"
+          <button
+              v-if="selectedLoginType === 1 || (isEditing && !showPasswordForm)"
+              class="modal-btn primary"
+              @click="qrCodeData ? (isScanning ? stopQrcodeCheck() : startQrcodeCheck()) : handleGenerateQrcode()"
+              :disabled="loading"
           >
             {{ loading ? '处理中...' : (qrCodeData ? (isScanning ? '停止检测' : '我已扫码') : '开始扫码') }}
           </button>
-          
+
           <!-- 密码登录按钮 -->
-          <button 
-            v-if="(selectedLoginType === 2 || (isEditing && showPasswordForm)) && formReady" 
-            class="modal-btn primary" 
-            @click="handlePasswordLogin" 
-            :disabled="loading || !username.trim() || !password.trim()"
+          <button
+              v-if="(selectedLoginType === 2 || (isEditing && showPasswordForm)) && formReady"
+              class="modal-btn primary"
+              @click="handlePasswordLogin"
+              :disabled="loading || !username.trim() || !password.trim()"
           >
             {{ loading ? '登录中...' : (isEditing ? '更新令牌' : '添加令牌') }}
           </button>
         </div>
       </div>
     </div>
-    
+
     <!-- 修改名称弹窗 -->
     <div class="modal-overlay" v-if="showNameModal" @click="closeNameModal">
       <div class="modal-content small" @click.stop>
@@ -241,20 +241,20 @@
           <h3 class="modal-title">修改令牌名称</h3>
           <button class="modal-close" @click="closeNameModal">✕</button>
         </div>
-        
+
         <div class="modal-body">
           <div class="form-group">
             <label class="form-label">令牌名称</label>
-            <input 
-              v-model="newTokenName" 
-              type="text" 
-              placeholder="请输入新的令牌名称"
-              class="form-input"
-              maxlength="50"
+            <input
+                v-model="newTokenName"
+                type="text"
+                placeholder="请输入新的令牌名称"
+                class="form-input"
+                maxlength="50"
             />
           </div>
         </div>
-        
+
         <div class="modal-footer">
           <button class="modal-btn secondary" @click="closeNameModal" :disabled="loading">
             取消
@@ -273,12 +273,12 @@
           <h3 class="modal-title">确认删除</h3>
           <button class="modal-close" @click="closeDeleteModal">✕</button>
         </div>
-        
+
         <div class="modal-body">
           <p>确定要删除令牌 <strong>{{ deleteTarget?.name }}</strong> 吗？</p>
           <p class="warning-text">此操作不可撤销，删除后相关的存储配置可能会失效。</p>
         </div>
-        
+
         <div class="modal-footer">
           <button class="modal-btn secondary" @click="closeDeleteModal" :disabled="loading">
             取消
@@ -289,13 +289,12 @@
         </div>
       </div>
     </div>
-  </Layout>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { cloudTokenApi, type CloudToken } from '@/api/cloudtoken'
-import Layout from '@/components/Layout.vue'
 import Icons from '@/components/Icons.vue'
 import PageCard from '@/components/PageCard.vue'
 import SectionDivider from '@/components/SectionDivider.vue'

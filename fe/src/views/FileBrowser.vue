@@ -34,16 +34,6 @@
             <Icons name="search" size="1rem" />
             搜索
           </button>
-          <button
-              v-if="settingStore.setting?.strmFileEnable"
-              @click="toggleShowStrmFiles"
-              class="action-btn"
-              :class="{ 'active': showStrmFiles }"
-              :title="showStrmFiles ? '隐藏STRM文件' : '显示STRM文件'"
-          >
-            <Icons name="file" size="1rem" />
-            {{ showStrmFiles ? '隐藏STRM' : '显示STRM' }}
-          </button>
           <button @click="refreshCurrentPath" class="action-btn secondary" :disabled="loading">
             <Icons name="refresh" size="1rem" />
             刷新
@@ -336,7 +326,6 @@ const error = ref<{ title: string; message: string } | null>(null)
 const fileBrowserRef = ref<HTMLElement | null>(null)
 const showBackToTop = ref(false)
 const headerFixed = ref(false)
-const showStrmFiles = ref(false)
 
 // 搜索相关数据
 const showSearchModal = ref(false)
@@ -395,13 +384,6 @@ const navigateToPath = (path: string) => {
   } else {
     router.push('/')
   }
-}
-
-// 切换显示STRM文件
-const toggleShowStrmFiles = () => {
-  showStrmFiles.value = !showStrmFiles.value
-  // 重新加载当前路径以应用新的过滤设置
-  loadFile(currentPath.value)
 }
 
 // 处理文件/文件夹点击
@@ -729,12 +711,7 @@ const loadFile = async (path: string) => {
     loading.value = true
     error.value = null
 
-    // 根据showStrmFiles状态决定是否包含STRM文件
-    const options = {
-      includeAutoGenerateStrmFile: showStrmFiles.value
-    }
-
-    const result = await fileApi.getFile(path, options)
+    const result = await fileApi.getFile(path)
 
     // 如果返回的是文件而不是文件夹，跳转到文件详情页面
     if (result && !result.isFolder && result.downloadURL) {

@@ -203,7 +203,7 @@ const handleLogin = async () => {
   
   try {
     await authStore.login(loginForm)
-    router.push('/@dashboard')
+    router.push('/@admin/dashboard')
   } catch (error: any) {
     errorMessage.value = error.msg || '登录失败，请检查用户名和密码'
   } finally {

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/enc"
+
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -92,7 +94,7 @@ func (s *service) FileDownload() gin.HandlerFunc {
 			"sign":      []string{req.Sign},
 		}
 
-		if !verify(values, key) {
+		if !enc.Verify(values, key) {
 			s.logger.Warn("文件下载请求签名验证失败",
 				zap.Int64("fileId", req.ID),
 				zap.String("sign", req.Sign))
