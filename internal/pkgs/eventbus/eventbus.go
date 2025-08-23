@@ -318,7 +318,7 @@ func (eb *eventBus) handleEventDirect(event *Event) {
 	eb.taskMu.Lock()
 	event.Status = "completed"
 	delete(eb.runningTasks, event.ID)
-	
+
 	// 从pending队列中移除已完成的任务（如果还在队列中）
 	for i, pendingEvent := range eb.pendingQueue {
 		if pendingEvent.ID == event.ID {
@@ -326,7 +326,7 @@ func (eb *eventBus) handleEventDirect(event *Event) {
 			break
 		}
 	}
-	
+
 	atomic.AddInt64(&eb.completedCount, 1)
 	eb.taskMu.Unlock()
 
@@ -372,7 +372,7 @@ func (eb *eventBus) GetPendingTasks() []TaskInfo {
 			Data:      event.Data,
 		})
 	}
-	
+
 	return tasks
 }
 

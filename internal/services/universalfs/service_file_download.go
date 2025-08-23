@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/html"
+
 	"github.com/xxcheng123/cloudpan189-share/internal/pkgs/enc"
 
 	"github.com/gin-gonic/gin"
@@ -107,9 +109,9 @@ func (s *service) FileDownload() gin.HandlerFunc {
 		}
 
 		if v, ok := s.cache.Get(fmt.Sprintf("file::url::%d", req.ID)); ok {
-			if url, ok := v.(string); ok {
+			if downURL, ok := v.(string); ok {
 				ctx.Header("X-Download-Url-Cache", "true")
-				s.doResponse(ctx, url)
+				s.doResponse(ctx, downURL)
 				return
 			} else {
 				s.logger.Warn("缓存中的URL格式错误", zap.Int64("fileId", req.ID))
@@ -538,12 +540,21 @@ func (s *service) getFileDownloadURL(ctx context.Context, id int64) (string, int
 		return "", http.StatusInternalServerError, err
 	}
 
+	var (
+		familyId string
+	)
+
 	if file.OsType == models.OsTypeStrmFile {
 		s.logger.Info("生成STRM文件下载链接",
 			zap.Int64("fileId", id),
 			zap.Int64("linkId", file.LinkId))
 
 		return s.generateDownloadURLWithNeverExpire(file.LinkId), http.StatusOK, nil
+	} else if file.OsType == models.OsTypeCloudFamilyFile {
+		familyId = utils.GetString(file.Addition, consts.FileAdditionKeyFamilyId)
+		if familyId == "" {
+			return "", http.StatusBadRequest, errors.New("familyId is empty")
+		}
 	}
 
 	cloudTokenId, err := s.findCloudTokenId(ctx, file)
@@ -574,27 +585,48 @@ func (s *service) getFileDownloadURL(ctx context.Context, id int64) (string, int
 		zap.Int64("fileId", id),
 		zap.String("cloudFileId", fileId))
 
-	result, err := client.New().WithToken(client.NewAuthToken(ct.AccessToken, ct.ExpiresIn)).
-		GetFileDownload(ctx, client.String(fileId), func(req *client.GetFileDownloadRequest) {
-			if v, ok := file.Addition[consts.FileAdditionKeyShareId]; ok {
-				req.ShareId, _ = utils.Int64(v)
-			}
-		})
+	var (
+		downloadURL string
+	)
 
-	if err != nil {
-		s.logger.Error("获取云盘文件下载链接失败",
-			zap.Int64("fileId", id),
-			zap.String("cloudFileId", fileId),
-			zap.Error(err))
+	if file.OsType == models.OsTypeCloudFamilyFile {
+		result, err := client.New().WithToken(client.NewAuthToken(ct.AccessToken, ct.ExpiresIn)).
+			FamilyGetFileDownload(ctx, client.String(familyId), client.String(fileId))
 
-		return "", http.StatusInternalServerError, err
+		if err != nil {
+			s.logger.Error("获取云盘文件下载链接失败",
+				zap.Int64("fileId", id),
+				zap.String("cloudFileId", fileId),
+				zap.Error(err))
+			return "", http.StatusInternalServerError, err
+		}
+
+		downloadURL = html.UnescapeString(result.FileDownloadUrl)
+	} else {
+		result, err := client.New().WithToken(client.NewAuthToken(ct.AccessToken, ct.ExpiresIn)).
+			GetFileDownload(ctx, client.String(fileId), func(req *client.GetFileDownloadRequest) {
+				if v, ok := file.Addition[consts.FileAdditionKeyShareId]; ok {
+					req.ShareId, _ = utils.Int64(v)
+				}
+			})
+
+		if err != nil {
+			s.logger.Error("获取云盘文件下载链接失败",
+				zap.Int64("fileId", id),
+				zap.String("cloudFileId", fileId),
+				zap.Error(err))
+
+			return "", http.StatusInternalServerError, err
+		}
+
+		downloadURL = result.FileDownloadUrl
 	}
 
-	resp, err := http.Get(result.FileDownloadUrl)
+	resp, err := http.Get(downloadURL)
 	if err != nil {
 		s.logger.Error("请求云盘下载链接失败",
 			zap.Int64("fileId", id),
-			zap.String("downloadUrl", result.FileDownloadUrl),
+			zap.String("downloadUrl", downloadURL),
 			zap.Error(err))
 
 		return "", http.StatusInternalServerError, err

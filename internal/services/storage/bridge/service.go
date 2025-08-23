@@ -1,43 +1,38 @@
-package storage
+package bridge
 
 import (
 	"context"
-	"time"
-
-	"github.com/pkg/errors"
-	"github.com/xxcheng123/cloudpan189-share/internal/models"
 
 	"github.com/gin-gonic/gin"
-	"github.com/patrickmn/go-cache"
+	"github.com/pkg/errors"
+	"github.com/xxcheng123/cloudpan189-share/internal/models"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
 type Service interface {
-	Add() gin.HandlerFunc
-	PreAdd() gin.HandlerFunc
-	Delete() gin.HandlerFunc
-	List() gin.HandlerFunc
-	ModifyToken() gin.HandlerFunc
-	BatchBindToken() gin.HandlerFunc
-	DeepRefreshFile() gin.HandlerFunc
-	Search() gin.HandlerFunc
-	ToggleAutoScan() gin.HandlerFunc
-	ScanTop() gin.HandlerFunc
+	GetPersonNodes() gin.HandlerFunc
+	GetFamilyNodes() gin.HandlerFunc
+	FamilyList() gin.HandlerFunc
 }
 
 type service struct {
 	db     *gorm.DB
 	logger *zap.Logger
-	cache  *cache.Cache
 }
 
 func NewService(db *gorm.DB, logger *zap.Logger) Service {
 	return &service{
 		db:     db,
 		logger: logger,
-		cache:  cache.New(time.Minute, time.Minute),
 	}
+}
+
+type FileNode struct {
+	ParentId string `json:"parentId"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	IsFolder int64  `json:"isFolder"`
 }
 
 func (s *service) getCloudToken(ctx context.Context, id int64) (*models.CloudToken, error) {

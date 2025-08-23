@@ -82,7 +82,7 @@
               </th>
               <th style="text-align: center">序号</th>
               <th style="text-align: center">挂载路径</th>
-              <th style="text-align: center">协议类型</th>
+              <th style="width: 100px; text-align: center">协议类型</th>
               <th style="width: 260px; text-align: center">任务状态</th>
               <th style="text-align: center">令牌绑定</th>
               <th style="text-align: center">创建时间</th>
@@ -113,7 +113,7 @@
               </td>
               <td>
                 <span class="protocol-badge" :class="`protocol-${storage.osType}`">
-                  {{ storage.osType === 'subscribe' ? '订阅' : '分享' }}
+                  {{ getProtocolLabel(storage.osType) }}
                 </span>
               </td>
               <td>
@@ -191,12 +191,19 @@
           </div>
           <div class="form-group">
             <label class="form-label">
-              <div>云盘令牌（可选）</div>
+              <div>云盘令牌{{ newStorage.protocol === 'person' || newStorage.protocol === 'family' ? '（必选）' : '（可选）' }}</div>
               <div style="font-size: 11px; color: #6b7280;">
-                如果没有绑定令牌，资源无法在线观看或下载
+                {{ newStorage.protocol === 'person' || newStorage.protocol === 'family' ?
+                   '个人和家庭类型必须选择云盘令牌' :
+                   '如果没有绑定令牌，资源无法在线观看或下载' }}
               </div>
             </label>
-            <Select v-model="newStorage.cloudToken" :options="tokenOptions" placeholder="请选择令牌" />
+            <Select
+              v-model="newStorage.cloudToken"
+              :options="tokenOptions"
+              placeholder="请选择令牌"
+              @change="watchCloudToken"
+            />
           </div>
           <div v-if="newStorage.protocol === 'subscribe'" class="form-group">
             <label class="form-label">订阅用户ID</label>
@@ -210,6 +217,72 @@
             <div class="form-group">
               <label class="form-label">访问码（可选）</label>
               <input v-model="newStorage.shareAccessCode" type="text" class="form-input" placeholder="请输入访问码（可选）" />
+            </div>
+          </div>
+          <div v-if="newStorage.protocol === 'person'">
+            <div class="form-group">
+              <label class="form-label">选择文件夹</label>
+              <div v-if="!newStorage.cloudToken" class="file-selector-placeholder">
+                请先选择云盘令牌
+              </div>
+              <FileTreeSelector
+                v-else
+                v-model="newStorage.fileId"
+                :cloud-token="newStorage.cloudToken"
+                @select="handlePersonFileSelect"
+              />
+            </div>
+            <div v-if="selectedPersonFileName" class="form-group">
+              <label class="form-label">已选择文件夹</label>
+              <div class="selected-file-info">
+                <Icons name="folder" size="1rem" />
+                <span>{{ selectedPersonFileName }}</span>
+                <button type="button" @click="clearPersonFileSelection" class="clear-selection">
+                  <Icons name="close" size="0.875rem" />
+                </button>
+              </div>
+            </div>
+          </div>
+          <div v-if="newStorage.protocol === 'family'">
+            <div class="form-group">
+              <label class="form-label">选择家庭</label>
+              <div v-if="!newStorage.cloudToken" class="file-selector-placeholder">
+                请先选择云盘令牌
+              </div>
+              <div v-else-if="familyListLoading" class="file-selector-loading">
+                <div class="loading-spinner-sm"></div>
+                <span>加载家庭列表中...</span>
+              </div>
+              <Select
+                v-else
+                v-model="newStorage.familyId"
+                :options="familyOptions"
+                placeholder="请选择家庭"
+                @change="handleFamilyChange"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">选择文件夹</label>
+              <div v-if="!newStorage.cloudToken || !newStorage.familyId" class="file-selector-placeholder">
+                请先选择云盘令牌和家庭
+              </div>
+              <FamilyFileTreeSelector
+                v-else
+                v-model="newStorage.fileId"
+                :cloud-token="newStorage.cloudToken"
+                :family-id="newStorage.familyId"
+                @select="handleFamilyFileSelect"
+              />
+            </div>
+            <div v-if="selectedFamilyFileName" class="form-group">
+              <label class="form-label">已选择文件夹</label>
+              <div class="selected-file-info">
+                <Icons name="folder" size="1rem" />
+                <span>{{ selectedFamilyFileName }}</span>
+                <button type="button" @click="clearFamilyFileSelection" class="clear-selection">
+                  <Icons name="close" size="0.875rem" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -445,13 +518,16 @@ import Icons from '@/components/Icons.vue'
 import PageCard from '@/components/PageCard.vue'
 import SectionDivider from '@/components/SectionDivider.vue'
 import SubsectionTitle from '@/components/SubsectionTitle.vue'
-import { ref, onMounted, computed, reactive, onUnmounted } from 'vue'
+import { ref, onMounted, computed, reactive, onUnmounted, watch } from 'vue'
 import { storageApi, type Storage, type AddStorageRequest } from '@/api/storage'
 import { cloudTokenApi, type CloudToken } from '@/api/cloudtoken'
 import { toast } from '@/utils/toast'
 import { confirmDialog } from '@/utils/confirm'
 import Select from '@/components/Select.vue'
 import Pagination from '@/components/Pagination.vue'
+import FileTreeSelector from '@/components/FileTreeSelector.vue'
+import FamilyFileTreeSelector from '@/components/FamilyFileTreeSelector.vue'
+import { storageBridgeApi, type FamilyInfo } from '@/api/storage_bridge'
 import { useSettingStore } from '@/stores/setting'
 import { parseMultipleCloudPan189Links, type CloudPan189ParseResult } from '@/utils/cloudpan189Parser'
 
@@ -491,6 +567,14 @@ const parseLoading = ref(false)
 const batchImportLoading = ref(false)
 const parsedResults = ref<ParsedResult[]>([])
 
+// 个人文件选择相关
+const selectedPersonFileName = ref('')
+
+// 家庭文件选择相关
+const availableFamilies = ref<FamilyInfo[]>([])
+const selectedFamilyFileName = ref('')
+const familyListLoading = ref(false)
+
 // 解析结果接口
 interface ParsedResult extends CloudPan189ParseResult {
   selected: boolean
@@ -508,13 +592,17 @@ const newStorage = reactive({
   cloudToken: '',
   subscribeUser: '',
   shareCode: '',
-  shareAccessCode: ''
+  shareAccessCode: '',
+  fileId: '',
+  familyId: ''
 })
 
 // 协议选项
 const protocolOptions = [
   { label: '订阅类型', value: 'subscribe' },
-  { label: '分享类型', value: 'share' }
+  { label: '分享类型', value: 'share' },
+  { label: '个人类型', value: 'person' },
+  { label: '家庭类型', value: 'family' }
 ]
 
 // 令牌选项
@@ -522,6 +610,14 @@ const tokenOptions = computed(() => {
   return availableTokens.value.map(token => ({
     label: token.name,
     value: token.id
+  }))
+})
+
+// 家庭选项
+const familyOptions = computed(() => {
+  return availableFamilies.value.map(family => ({
+    label: family.remarkName || family.familyId,
+    value: family.familyId
   }))
 })
 
@@ -541,6 +637,11 @@ const allResultsSelected = computed(() => {
 
 const selectedResultsCount = computed(() => {
   return parsedResults.value.filter(result => result.selected).length
+})
+
+// 检查是否有弹窗打开
+const hasModalOpen = computed(() => {
+  return showAddModal.value || showBindModal.value || showBatchBindModal.value || showSmartParseModal.value
 })
 
 // 获取存储列表
@@ -564,15 +665,6 @@ const fetchStorages = async () => {
 }
 
 let refreshTimer: ReturnType<typeof setInterval>
-onMounted(() => {
-  refreshTimer = setInterval(() => {
-    fetchStorages()
-  }, 30 * 1000)
-})
-
-onUnmounted(() => {
-  clearInterval(refreshTimer)
-})
 
 // 获取可用令牌列表
 const fetchAvailableTokens = async () => {
@@ -582,6 +674,28 @@ const fetchAvailableTokens = async () => {
   } catch (error) {
     console.error('获取令牌列表失败:', error)
     availableTokens.value = []
+  }
+}
+
+// 获取家庭列表
+const fetchFamilyList = async (cloudToken: string | number) => {
+  if (!cloudToken) {
+    availableFamilies.value = []
+    return
+  }
+  
+  try {
+    familyListLoading.value = true
+    const response = await storageBridgeApi.getFamilyList({
+      cloudToken: Number(cloudToken)
+    })
+    availableFamilies.value = response || []
+  } catch (error) {
+    console.error('获取家庭列表失败:', error)
+    availableFamilies.value = []
+    toast.error('获取家庭列表失败')
+  } finally {
+    familyListLoading.value = false
   }
 }
 
@@ -611,8 +725,15 @@ const closeAddModal = () => {
     cloudToken: '',
     subscribeUser: '',
     shareCode: '',
-    shareAccessCode: ''
+    shareAccessCode: '',
+    fileId: '',
+    familyId: ''
   })
+  // 清空个人文件选择相关数据
+  selectedPersonFileName.value = ''
+  // 清空家庭文件选择相关数据
+  selectedFamilyFileName.value = ''
+  availableFamilies.value = []
 }
 
 const confirmAddStorage = async () => {
@@ -629,6 +750,28 @@ const confirmAddStorage = async () => {
   } else if (newStorage.protocol === 'share') {
     if (!newStorage.shareCode.trim()) {
       toast.warning('请输入分享码')
+      return
+    }
+  } else if (newStorage.protocol === 'person') {
+    if (!newStorage.cloudToken) {
+      toast.warning('个人类型需要选择云盘令牌')
+      return
+    }
+    if (!newStorage.fileId.trim()) {
+      toast.warning('请选择文件')
+      return
+    }
+  } else if (newStorage.protocol === 'family') {
+    if (!newStorage.cloudToken) {
+      toast.warning('家庭类型需要选择云盘令牌')
+      return
+    }
+    if (!newStorage.familyId.trim()) {
+      toast.warning('请选择家庭')
+      return
+    }
+    if (!newStorage.fileId.trim()) {
+      toast.warning('请选择文件夹')
       return
     }
   }
@@ -651,6 +794,11 @@ const confirmAddStorage = async () => {
       if (newStorage.shareAccessCode.trim()) {
         requestData.shareAccessCode = newStorage.shareAccessCode.trim()
       }
+    } else if (newStorage.protocol === 'person') {
+      requestData.fileId = newStorage.fileId.trim()
+    } else if (newStorage.protocol === 'family') {
+      requestData.familyId = newStorage.familyId.trim()
+      requestData.fileId = newStorage.fileId.trim()
     }
 
     await storageApi.add(requestData)
@@ -1105,6 +1253,82 @@ const batchImportStorages = async () => {
   }
 }
 
+// 监听云盘令牌变化
+const watchCloudToken = () => {
+  // 清空个人文件选择
+  selectedPersonFileName.value = ''
+  newStorage.fileId = ''
+  
+  // 清空家庭相关数据
+  availableFamilies.value = []
+  selectedFamilyFileName.value = ''
+  newStorage.familyId = ''
+  
+  // 如果选择了令牌且协议是家庭类型，则获取家庭列表
+  if (newStorage.cloudToken && newStorage.protocol === 'family') {
+    fetchFamilyList(newStorage.cloudToken)
+  }
+}
+
+// 处理个人文件选择
+const handlePersonFileSelect = (file: any) => {
+  newStorage.fileId = file.id
+  selectedPersonFileName.value = file.name
+}
+
+// 清空个人文件选择
+const clearPersonFileSelection = () => {
+  newStorage.fileId = ''
+  selectedPersonFileName.value = ''
+}
+
+// 处理家庭变化
+const handleFamilyChange = () => {
+  // 清空文件选择
+  selectedFamilyFileName.value = ''
+  newStorage.fileId = ''
+}
+
+// 处理家庭文件选择
+const handleFamilyFileSelect = (file: any) => {
+  newStorage.fileId = file.id
+  selectedFamilyFileName.value = file.name
+}
+
+// 清空家庭文件选择
+const clearFamilyFileSelection = () => {
+  newStorage.fileId = ''
+  selectedFamilyFileName.value = ''
+}
+
+
+// 获取协议标签
+const getProtocolLabel = (protocol: string): string => {
+  switch (protocol) {
+    case 'subscribe':
+      return '订阅'
+    case 'share':
+      return '分享'
+    case 'cloud_folder':
+      return '个人'
+    case 'cloud_family_folder':
+      return '家庭'
+    default:
+      return protocol
+  }
+}
+
+// 监听弹窗状态，控制背景滚动
+watch(hasModalOpen, (isOpen) => {
+  if (isOpen) {
+    // 禁用背景滚动
+    document.body.style.overflow = 'hidden'
+  } else {
+    // 恢复背景滚动
+    document.body.style.overflow = ''
+  }
+})
+
 // 组件挂载时获取数据
 onMounted(() => {
   // 从localStorage恢复页面大小设置
@@ -1117,6 +1341,18 @@ onMounted(() => {
   fetchAvailableTokens()
   // 获取设置信息以显示扫描配置
   settingStore.fetchSetting()
+  
+  // 启动定时刷新
+  refreshTimer = setInterval(() => {
+    fetchStorages()
+  }, 30 * 1000)
+})
+
+// 组件卸载时恢复滚动
+onUnmounted(() => {
+  // 确保在组件卸载时恢复滚动
+  document.body.style.overflow = ''
+  clearInterval(refreshTimer)
 })
 </script>
 
@@ -1389,6 +1625,16 @@ onMounted(() => {
 .protocol-share {
   background: #fef3c7;
   color: #d97706;
+}
+
+.protocol-cloud_folder {
+  background: #f0f9ff;
+  color: #0369a1;
+}
+
+.protocol-cloud_family_folder {
+  background: #fdf4ff;
+  color: #a21caf;
 }
 
 .token-info {
@@ -2025,6 +2271,81 @@ onMounted(() => {
   transition: border-color 0.2s, box-shadow 0.2s;
   box-sizing: border-box;
 }
+/* 文件选择器样式 */
+.file-selector-placeholder {
+  padding: 2rem;
+  text-align: center;
+  color: #9ca3af;
+  background: #f9fafb;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.file-selector-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.loading-spinner-sm {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e5e7eb;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.file-selector-empty {
+  padding: 2rem;
+  text-align: center;
+  color: #9ca3af;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+
+.selected-file-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #1d4ed8;
+}
+
+.clear-selection {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  margin-left: auto;
+}
+
+.clear-selection:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
 
 .form-input-sm:focus {
   outline: none;

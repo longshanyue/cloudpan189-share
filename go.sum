@@ -152,8 +152,8 @@ github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS
 github.com/twitchyliquid64/golang-asm v0.15.1/go.mod h1:a1lVb/DtPvCB8fslRZhAngC2+aY1QWCk3Cedj/Gdt08=
 github.com/ugorji/go/codec v1.2.12 h1:9LC83zGrHhuUA9l16C9AHXAqEV/2wBQ4nkvumAE65EE=
 github.com/ugorji/go/codec v1.2.12/go.mod h1:UNopzCgEMSXjBc6AOMqYvWC1ktqTAfzJZUZgYf6w6lg=
-github.com/xxcheng123/cloudpan189-interface v1.0.2 h1:vYN4XAAkfFvWPsGpkq4ek8CKUxReZZN6AeEdS7K8fZE=
-github.com/xxcheng123/cloudpan189-interface v1.0.2/go.mod h1:HhJAEtxYzq9dZxprvOBaIdBkwKT7iY+cBiJ4/BsRntw=
+github.com/xxcheng123/cloudpan189-interface v1.0.3 h1:kHLo9tjEU3+WcgpJ1k7Oyg6yD3Qf6xeXRoxBPm6s2Bk=
+github.com/xxcheng123/cloudpan189-interface v1.0.3/go.mod h1:HhJAEtxYzq9dZxprvOBaIdBkwKT7iY+cBiJ4/BsRntw=
 github.com/xxcheng123/multistreamer v1.0.1 h1:xjwyYMtaTzq7uxcZleu88ofEGmiE0AEpaAydePEPGBs=
 github.com/xxcheng123/multistreamer v1.0.1/go.mod h1:o86TuPGDbxqBrd2NIEr1uv67yFhrQUVh/FPO0uGvyTs=
 github.com/zeromicro/go-zero v1.8.5 h1:YkdQhYllE+BPOrxcni0oCewebs7qHfXvjN9glnpcmJQ=

@@ -23,7 +23,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import Icons from './Icons.vue'
 
 interface Props {
@@ -34,7 +34,7 @@ interface Props {
   isDanger?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   title: '确认操作',
   confirmText: '确定',
   cancelText: '取消',
@@ -69,6 +69,17 @@ const handleCancel = () => {
 const handleOverlayClick = () => {
   handleCancel()
 }
+
+// 监听弹窗显示状态，控制背景滚动
+watch(visible, (isVisible) => {
+  if (isVisible) {
+    // 禁用背景滚动
+    document.body.style.overflow = 'hidden'
+  } else {
+    // 恢复背景滚动
+    document.body.style.overflow = ''
+  }
+})
 
 defineExpose({
   show,
