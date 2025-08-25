@@ -396,6 +396,9 @@ func (w *busWorker) getShareFiles(ctx context.Context, f *models.VirtualFile) ([
 				subResp, subErr := w.client.ListShareDir(ctx, shareId, client.String(fileId), func(req *client.ListShareFileRequest) {
 					req.PageNum = int(pageNum)
 					req.PageSize = pageSize
+					req.IsFolder, _ = utils.Bool(vv)
+					req.AccessCode = accessCode
+					req.ShareMode = shareMode
 				})
 				if subErr != nil {
 					mu.Lock()
