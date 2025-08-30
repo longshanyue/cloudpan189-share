@@ -8,7 +8,7 @@ export interface CloudPan189ParseResult {
   shareId: string
   accessCode?: string
   originalUrl: string
-  type: 'share' | 'subscribe' // 链接类型
+  type: 'share' | 'subscribe' | 'subscribe_share' // 链接类型
 }
 
 // 解析错误类
@@ -87,23 +87,41 @@ function parseCloudPanShareLink(input: string): CloudPan189ParseResult {
  * @returns 解析结果
  */
 function parse21cnSubscribeLink(input: string): CloudPan189ParseResult {
-  // 匹配21cn订阅链接中的uuid
-  const uuidRegex = /https?:\/\/content\.21cn\.com\/h5\/subscrip\/index\.html#\/pages\/own-home\/index\?uuid=([a-f0-9]{32})/i
+  // 匹配21cn订阅分享链接（包含uuid和shareCode）
+  const subscribeShareRegex = /https?:\/\/content\.21cn\.com\/h5\/subscrip\/index\.html#\/pages\/own-home\/index\?uuid=([a-f0-9]{32})&shareCode=([a-zA-Z0-9]+)/i
   
-  const match = input.match(uuidRegex)
+  // 匹配普通21cn订阅链接（只有uuid）
+  const subscribeRegex = /https?:\/\/content\.21cn\.com\/h5\/subscrip\/index\.html#\/pages\/own-home\/index\?uuid=([a-f0-9]{32})/i
   
-  if (!match) {
-    throw new CloudPan189ParseError('未找到有效的21cn订阅链接或uuid格式错误', input)
+  // 优先匹配订阅分享类型
+  let match = input.match(subscribeShareRegex)
+  if (match) {
+    const uuid = match[1]
+    const shareCode = match[2]
+    const originalUrl = match[0]
+    
+    return {
+      shareId: uuid,
+      accessCode: shareCode, // 将shareCode存储在accessCode字段中
+      originalUrl,
+      type: 'subscribe_share'
+    }
   }
   
-  const uuid = match[1]
-  const originalUrl = match[0]
-  
-  return {
-    shareId: uuid,
-    originalUrl,
-    type: 'subscribe'
+  // 匹配普通订阅类型
+  match = input.match(subscribeRegex)
+  if (match) {
+    const uuid = match[1]
+    const originalUrl = match[0]
+    
+    return {
+      shareId: uuid,
+      originalUrl,
+      type: 'subscribe'
+    }
   }
+  
+  throw new CloudPan189ParseError('未找到有效的21cn订阅链接或uuid格式错误', input)
 }
 
 /**
@@ -144,11 +162,28 @@ export function parseMultipleCloudPan189Links(input: string): CloudPan189ParseRe
     })
   }
   
-  // 匹配21cn订阅链接
-  const cnUrlRegex = /https?:\/\/content\.21cn\.com\/h5\/subscrip\/index\.html#\/pages\/own-home\/index\?uuid=([a-f0-9]{32})/gi
-  const cnMatches = Array.from(cleanInput.matchAll(cnUrlRegex))
+  // 匹配21cn订阅分享链接（包含uuid和shareCode）
+  const cnSubscribeShareRegex = /https?:\/\/content\.21cn\.com\/h5\/subscrip\/index\.html#\/pages\/own-home\/index\?uuid=([a-f0-9]{32})&shareCode=([a-zA-Z0-9]+)/gi
+  const cnSubscribeShareMatches = Array.from(cleanInput.matchAll(cnSubscribeShareRegex))
   
-  for (const match of cnMatches) {
+  for (const match of cnSubscribeShareMatches) {
+    const uuid = match[1]
+    const shareCode = match[2]
+    const originalUrl = match[0]
+    
+    results.push({
+      shareId: uuid,
+      accessCode: shareCode,
+      originalUrl,
+      type: 'subscribe_share'
+    })
+  }
+  
+  // 匹配21cn普通订阅链接（只有uuid）
+  const cnSubscribeRegex = /https?:\/\/content\.21cn\.com\/h5\/subscrip\/index\.html#\/pages\/own-home\/index\?uuid=([a-f0-9]{32})(?!&shareCode=)/gi
+  const cnSubscribeMatches = Array.from(cleanInput.matchAll(cnSubscribeRegex))
+  
+  for (const match of cnSubscribeMatches) {
     const uuid = match[1]
     const originalUrl = match[0]
     
@@ -168,12 +203,12 @@ export function parseMultipleCloudPan189Links(input: string): CloudPan189ParseRe
  * @param type 链接类型
  * @returns 是否有效
  */
-export function isValidShareId(shareId: string, type: 'share' | 'subscribe' = 'share'): boolean {
+export function isValidShareId(shareId: string, type: 'share' | 'subscribe' | 'subscribe_share' = 'share'): boolean {
   if (!shareId || typeof shareId !== 'string') {
     return false
   }
   
-  if (type === 'subscribe') {
+  if (type === 'subscribe' || type === 'subscribe_share') {
     // uuid格式：32位十六进制字符
     return /^[a-f0-9]{32}$/i.test(shareId)
   }
@@ -199,17 +234,24 @@ export function isValidAccessCode(accessCode: string): boolean {
 /**
  * 构建天翼云盘分享链接或21cn订阅链接
  * @param shareId 分享ID或uuid
- * @param accessCode 访问码（可选）
+ * @param accessCode 访问码或分享码（可选）
  * @param type 链接类型
  * @returns 完整的分享链接
  */
-export function buildCloudPan189Link(shareId: string, accessCode?: string, type: 'share' | 'subscribe' = 'share'): string {
+export function buildCloudPan189Link(shareId: string, accessCode?: string, type: 'share' | 'subscribe' | 'subscribe_share' = 'share'): string {
   if (!isValidShareId(shareId, type)) {
-    throw new CloudPan189ParseError(`无效的${type === 'subscribe' ? 'uuid' : '分享ID'}格式`)
+    throw new CloudPan189ParseError(`无效的${type === 'subscribe' || type === 'subscribe_share' ? 'uuid' : '分享ID'}格式`)
   }
   
   if (type === 'subscribe') {
     return `https://content.21cn.com/h5/subscrip/index.html#/pages/own-home/index?uuid=${shareId}`
+  }
+  
+  if (type === 'subscribe_share') {
+    if (!accessCode) {
+      throw new CloudPan189ParseError('订阅分享链接需要提供分享码')
+    }
+    return `https://content.21cn.com/h5/subscrip/index.html#/pages/own-home/index?uuid=${shareId}&shareCode=${accessCode}`
   }
   
   const baseUrl = `https://cloud.189.cn/t/${shareId}`

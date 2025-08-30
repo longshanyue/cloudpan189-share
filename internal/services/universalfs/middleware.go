@@ -66,19 +66,19 @@ func (s *service) BaseMiddleware() gin.HandlerFunc {
 			fid = 0
 			pid = -1
 		} else {
-			for idx, p := range paths {
+			for _, p := range paths {
 				var tmpFile = new(models.VirtualFile)
 				if err = s.db.WithContext(ctx).Where("parent_id", fid).Where("name", p).First(tmpFile).Error; err != nil {
 					if errors.Is(err, gorm.ErrRecordNotFound) {
-						if ctx.Request.Method == http.MethodPut && len(paths)-1 == idx {
-							// 这个情况表示要写入文件，但是文件不存在
-							// 取到父级目录的ID
-							pid = fid
-							fid = -1
-							ctx.Set(consts.CtxKeyFilename, p)
-
-							break
-						}
+						//if ctx.Request.Method == http.MethodPut && len(paths)-1 == idx {
+						//	// 这个情况表示要写入文件，但是文件不存在
+						//	// 取到父级目录的ID
+						//	pid = fid
+						//	fid = -1
+						//	ctx.Set(consts.CtxKeyFilename, p)
+						//
+						//	break
+						//}
 
 						s.logger.Warn("文件未找到", zap.String("path", rawPath), zap.String("filename", p))
 

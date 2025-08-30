@@ -450,6 +450,12 @@ func (w *busWorker) deleteVirtualFileHook(ctx context.Context, fileId int64) err
 		if err := w.delMediaFile(ctx, fileId); err != nil {
 			errs = append(errs, err)
 		}
+
+		// 删除媒体文件后自动清理空文件夹（目前会删除所有的空文件夹）
+		if _, err := w.clearEmptyDirs(ctx); err != nil {
+			w.logger.Warn("清理空文件夹失败", zap.Int64("file_id", fileId), zap.Error(err))
+			// 不将此错误加入到errs中，因为这不应该阻止删除操作
+		}
 	}
 
 	return errors2.Join(errs...)

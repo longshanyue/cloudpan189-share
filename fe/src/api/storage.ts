@@ -12,7 +12,7 @@ export interface Storage {
   id: number
   parentId: number
   name: string
-  osType: string //  subscribe：订阅类型；share：分享类型；person：个人类型；family：家庭类型
+  osType: string //  subscribe：订阅类型；share：分享类型；person：个人类型；family：家庭类型；subscribe_share：订阅分享类型
   createdAt: string
   updatedAt: string
   localPath: string
@@ -27,9 +27,9 @@ export interface Storage {
 }
 
 export interface PreAddStorageRequest {
-  protocol: string  // 目前只允许 subscribe、share
-  subscribeUser?: string // subscribe 时必填
-  shareCode?: string // share 时必填
+  protocol: string  // 目前允许 subscribe、share、subscribe_share
+  subscribeUser?: string // subscribe、subscribe_share 时必填
+  shareCode?: string // share、subscribe_share 时必填
   shareAccessCode?: string // share 时可选
   cloudToken?: number
 }
@@ -41,10 +41,10 @@ export interface PreAddStorageResponse {
 
 export interface AddStorageRequest {
   localPath: string
-  protocol: string  // 目前允许 subscribe、share、person、family
+  protocol: string  // 目前允许 subscribe、share、person、family、subscribe_share
   cloudToken?: number // person、family 时必填
-  subscribeUser?: string // subscribe 时必填
-  shareCode?: string // share 时必填
+  subscribeUser?: string // subscribe、subscribe_share 时必填
+  shareCode?: string // share、subscribe_share 时必填
   shareAccessCode?: string // share 时可选
   fileId?: string // person、family 时必填
   familyId?: string // family 时必填

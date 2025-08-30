@@ -134,10 +134,10 @@ func StartHTTPServer() error {
 		openapiRouter.GET("/open_file/*path", userService.AuthMiddleware(models.PermissionBase), universalFsService.BaseMiddleware(), universalFsService.Open("/", "json"))
 		openapiRouter.DELETE("/open_file/*path", userService.AuthMiddleware(models.PermissionBase), universalFsService.BaseMiddleware(), universalFsService.Delete())
 
-		davMethods := []string{"GET", "HEAD", "POST", "OPTIONS", "PROPFIND", "MKCOL", "MOVE", "LOCK", "UNLOCK"}
+		davMethods := []string{"GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PROPFIND", "MKCOL", "MOVE", "LOCK", "UNLOCK"}
 
 		handler := []gin.HandlerFunc{
-			userService.BasicAuthMiddleware(models.PermissionBase),
+			userService.BasicAuthMiddleware(models.PermissionDavRead),
 			universalFsService.DavMiddleware(),
 			universalFsService.BaseMiddleware(),
 		}
@@ -166,10 +166,6 @@ func StartHTTPServer() error {
 			for _, r := range registry {
 				engine.Handle(method, r.path, append(r.handlers, universalFsService.Open(r.prefix, r.format))...)
 			}
-		}
-
-		for _, r := range registry {
-			engine.Handle(http.MethodDelete, r.path, append(r.handlers, universalFsService.Delete())...)
 		}
 
 		openapiRouter.GET("/file_download", universalFsService.FileDownload())

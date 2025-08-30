@@ -6,7 +6,7 @@ require (
 	github.com/bradenaw/juniper v0.15.3
 	github.com/bytedance/gopkg v0.1.2
 	github.com/deckarep/golang-set/v2 v2.8.0
-	github.com/gin-gonic/gin v1.10.1
+	github.com/gin-gonic/gin v1.9.1
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-playground/locales v0.14.1
 	github.com/go-playground/universal-translator v0.18.1
