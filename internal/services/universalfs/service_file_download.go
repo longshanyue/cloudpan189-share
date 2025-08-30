@@ -622,7 +622,7 @@ func (s *service) getFileDownloadURL(ctx context.Context, id int64) (string, int
 		downloadURL = result.FileDownloadUrl
 	}
 
-	resp, err := http.Get(downloadURL)
+	resp, err := utils.NoFollowRedirectHttpClient.Get(downloadURL)
 	if err != nil {
 		s.logger.Error("请求云盘下载链接失败",
 			zap.Int64("fileId", id),
