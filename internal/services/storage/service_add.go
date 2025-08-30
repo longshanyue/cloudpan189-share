@@ -18,7 +18,7 @@ import (
 
 type addRequest struct {
 	LocalPath       string `json:"localPath" binding:"required"`
-	Protocol        string `json:"protocol" binding:"required,oneof=subscribe share person family"`
+	Protocol        string `json:"protocol" binding:"required,oneof=subscribe share person family subscribe_share"`
 	SubscribeUser   string `json:"subscribeUser"`
 	ShareCode       string `json:"shareCode"`
 	ShareAccessCode string `json:"shareAccessCode"`
@@ -92,6 +92,15 @@ func (s *service) Add() gin.HandlerFunc {
 			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
 				Code:    http.StatusBadRequest,
 				Message: "subscribeUser is required",
+			})
+
+			return
+		}
+
+		if req.Protocol == "subscribe_share" && (req.SubscribeUser == "" || req.ShareCode == "") {
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: "subscribeUser or shareCode is required",
 			})
 
 			return
@@ -245,6 +254,42 @@ func (s *service) Add() gin.HandlerFunc {
 				m.Addition[consts.FileAdditionKeyFamilyId] = req.FamilyId
 				m.OsType = models.OsTypeCloudFamilyFolder
 			}
+		} else if req.Protocol == "subscribe_share" {
+			resp, err := client.New().GetShareInfo(ctx, req.ShareCode)
+			if err != nil {
+				var clientErr = new(client.RespErr)
+				if errors.As(err, &clientErr) {
+					if clientErr.ResCode == "ShareAuditWaiting" {
+						ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+							Code:    http.StatusBadRequest,
+							Message: "当前分享审核中，请稍后再试",
+						})
+
+						return
+					}
+				}
+
+				ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+					Code:    http.StatusInternalServerError,
+					Message: err.Error(),
+				})
+
+				return
+			}
+
+			if resp.ShareId == 0 {
+				ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+					Code:    http.StatusInternalServerError,
+					Message: "分享查询失败",
+				})
+
+				return
+			}
+
+			m.Addition[consts.FileAdditionKeySubscribeUser] = req.SubscribeUser
+			m.Addition[consts.FileAdditionKeyShareId] = resp.ShareId
+			m.Addition[consts.FileAdditionKeyFileId] = resp.FileId
+			m.Addition[consts.FileAdditionKeyIsFolder] = resp.IsFolder
 		}
 
 		pid, err := s.findOrCreateAncestors(ctx, req.LocalPath)

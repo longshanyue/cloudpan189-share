@@ -82,7 +82,7 @@
               </th>
               <th style="text-align: center">序号</th>
               <th style="text-align: center">挂载路径</th>
-              <th style="width: 100px; text-align: center">协议类型</th>
+              <th style="width: 140px; text-align: center">协议类型</th>
               <th style="width: 260px; text-align: center">任务状态</th>
               <th style="text-align: center">令牌绑定</th>
               <th style="text-align: center">创建时间</th>
@@ -217,6 +217,16 @@
             <div class="form-group">
               <label class="form-label">访问码（可选）</label>
               <input v-model="newStorage.shareAccessCode" type="text" class="form-input" placeholder="请输入访问码（可选）" />
+            </div>
+          </div>
+          <div v-if="newStorage.protocol === 'subscribe_share'">
+            <div class="form-group">
+              <label class="form-label">订阅用户ID</label>
+              <input v-model="newStorage.subscribeUser" type="text" class="form-input" placeholder="请输入订阅用户ID" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">分享码</label>
+              <input v-model="newStorage.shareCode" type="text" class="form-input" placeholder="请输入分享码" />
             </div>
           </div>
           <div v-if="newStorage.protocol === 'person'">
@@ -429,7 +439,7 @@
                     </td>
                     <td>
                       <span class="result-type" :class="`type-${result.type}`">
-                        {{ result.type === 'subscribe' ? '订阅' : '分享' }}
+                        {{ result.type === 'subscribe' ? '订阅' : result.type === 'subscribe_share' ? '订阅分享' : '分享' }}
                       </span>
                     </td>
                     <td>
@@ -456,7 +466,7 @@
                     </td>
                     <td>
                       <input 
-                        v-if="result.type === 'subscribe'"
+                        v-if="result.type === 'subscribe' || result.type === 'subscribe_share'"
                         v-model="result.subscribeUser" 
                         type="text" 
                         class="table-input" 
@@ -466,7 +476,7 @@
                     </td>
                     <td>
                       <input 
-                        v-if="result.type === 'share'"
+                        v-if="result.type === 'share' || result.type === 'subscribe_share'"
                         v-model="result.shareCode" 
                         type="text" 
                         class="table-input" 
@@ -601,6 +611,7 @@ const newStorage = reactive({
 const protocolOptions = [
   { label: '订阅类型', value: 'subscribe' },
   { label: '分享类型', value: 'share' },
+  { label: '订阅分享类型', value: 'subscribe_share' },
   { label: '个人类型', value: 'person' },
   { label: '家庭类型', value: 'family' }
 ]
@@ -752,6 +763,15 @@ const confirmAddStorage = async () => {
       toast.warning('请输入分享码')
       return
     }
+  } else if (newStorage.protocol === 'subscribe_share') {
+    if (!newStorage.subscribeUser.trim()) {
+      toast.warning('请输入订阅用户ID')
+      return
+    }
+    if (!newStorage.shareCode.trim()) {
+      toast.warning('请输入分享码')
+      return
+    }
   } else if (newStorage.protocol === 'person') {
     if (!newStorage.cloudToken) {
       toast.warning('个人类型需要选择云盘令牌')
@@ -794,7 +814,10 @@ const confirmAddStorage = async () => {
       if (newStorage.shareAccessCode.trim()) {
         requestData.shareAccessCode = newStorage.shareAccessCode.trim()
       }
-    } else if (newStorage.protocol === 'person') {
+    } else if (newStorage.protocol === 'subscribe_share') {
+       requestData.subscribeUser = newStorage.subscribeUser.trim()
+       requestData.shareCode = newStorage.shareCode.trim()
+     } else if (newStorage.protocol === 'person') {
       requestData.fileId = newStorage.fileId.trim()
     } else if (newStorage.protocol === 'family') {
       requestData.familyId = newStorage.familyId.trim()
@@ -1122,7 +1145,7 @@ const parseLinks = async () => {
     for (const result of results) {
       try {
         const preAddData: any = {
-          protocol: result.type === 'subscribe' ? 'subscribe' : 'share'
+          protocol: result.type === 'subscribe' ? 'subscribe' : result.type === 'subscribe_share' ? 'subscribe_share' : 'share'
         }
         
         if (result.type === 'subscribe') {
@@ -1132,6 +1155,9 @@ const parseLinks = async () => {
           if (result.accessCode) {
             preAddData.shareAccessCode = result.accessCode
           }
+        } else if (result.type === 'subscribe_share') {
+          preAddData.subscribeUser = result.shareId
+          preAddData.shareCode = result.accessCode
         }
         
         if (defaultCloudToken.value) {
@@ -1147,8 +1173,8 @@ const parseLinks = async () => {
           suggestedName,
           localPath: defaultPathPrefix.value ? `${defaultPathPrefix.value}/${suggestedName}` : `/${suggestedName}`,
           cloudToken: defaultCloudToken.value,
-          subscribeUser: result.type === 'subscribe' ? result.shareId : '',
-          shareCode: result.type === 'share' ? result.shareId : ''
+          subscribeUser: result.type === 'subscribe' || result.type === 'subscribe_share' ? result.shareId : '',
+          shareCode: result.type === 'share' ? result.shareId : result.type === 'subscribe_share' ? result.accessCode : ''
         })
       } catch (error) {
         console.warn(`链接验证失败 (${result.originalUrl}):`, error)
@@ -1193,6 +1219,7 @@ const batchImportStorages = async () => {
     if (!result.localPath.trim()) return true
     if (result.type === 'subscribe' && !result.subscribeUser?.trim()) return true
     if (result.type === 'share' && !result.shareCode?.trim()) return true
+    if (result.type === 'subscribe_share' && (!result.subscribeUser?.trim() || !result.shareCode?.trim())) return true
     return false
   })
 
@@ -1211,7 +1238,7 @@ const batchImportStorages = async () => {
       try {
         const requestData: AddStorageRequest = {
           localPath: result.localPath.trim(),
-          protocol: result.type === 'subscribe' ? 'subscribe' : 'share'
+          protocol: result.type === 'subscribe' ? 'subscribe' : result.type === 'subscribe_share' ? 'subscribe_share' : 'share'
         }
 
         if (result.cloudToken) {
@@ -1225,6 +1252,9 @@ const batchImportStorages = async () => {
           if (result.accessCode?.trim()) {
             requestData.shareAccessCode = result.accessCode.trim()
           }
+        } else if (result.type === 'subscribe_share') {
+          requestData.subscribeUser = result.subscribeUser!.trim()
+          requestData.shareCode = result.shareCode!.trim()
         }
 
         await storageApi.add(requestData)
@@ -1309,6 +1339,8 @@ const getProtocolLabel = (protocol: string): string => {
       return '订阅'
     case 'share':
       return '分享'
+    case 'subscribe_share':
+      return '订阅分享'
     case 'cloud_folder':
       return '个人'
     case 'cloud_family_folder':
@@ -1625,6 +1657,11 @@ onUnmounted(() => {
 .protocol-share {
   background: #fef3c7;
   color: #d97706;
+}
+
+.protocol-subscribe_share {
+  background: #f0fdf4;
+  color: #15803d;
 }
 
 .protocol-cloud_folder {

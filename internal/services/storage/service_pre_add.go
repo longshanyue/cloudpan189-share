@@ -10,7 +10,7 @@ import (
 )
 
 type preAddRequest struct {
-	Protocol        string `json:"protocol" binding:"required,oneof=subscribe share"`
+	Protocol        string `json:"protocol" binding:"required,oneof=subscribe share subscribe_share"`
 	SubscribeUser   string `json:"subscribeUser"`
 	ShareCode       string `json:"shareCode"`
 	ShareAccessCode string `json:"shareAccessCode"`
@@ -48,6 +48,15 @@ func (s *service) PreAdd() gin.HandlerFunc {
 			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
 				Code:    http.StatusBadRequest,
 				Message: "分享码不能为空",
+			})
+
+			return
+		}
+
+		if req.Protocol == "subscribe_share" && (req.SubscribeUser == "" || req.ShareCode == "") {
+			ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+				Code:    http.StatusBadRequest,
+				Message: "subscribeUser or shareCode is required",
 			})
 
 			return
@@ -102,6 +111,39 @@ func (s *service) PreAdd() gin.HandlerFunc {
 				ctx.JSON(http.StatusInternalServerError, gin.H{
 					"code":    http.StatusInternalServerError,
 					"message": "分享查询失败",
+				})
+
+				return
+			}
+
+			name = resp.FileName
+		} else if req.Protocol == "subscribe_share" {
+			resp, err := client.New().GetShareInfo(ctx, req.ShareCode)
+			if err != nil {
+				var clientErr = new(client.RespErr)
+				if errors.As(err, &clientErr) {
+					if clientErr.ResCode == "ShareAuditWaiting" {
+						ctx.JSON(http.StatusBadRequest, types.ErrResponse{
+							Code:    http.StatusBadRequest,
+							Message: "当前分享审核中，请稍后再试",
+						})
+
+						return
+					}
+				}
+
+				ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+					Code:    http.StatusInternalServerError,
+					Message: err.Error(),
+				})
+
+				return
+			}
+
+			if resp.ShareId == 0 {
+				ctx.JSON(http.StatusInternalServerError, types.ErrResponse{
+					Code:    http.StatusInternalServerError,
+					Message: "分享查询失败",
 				})
 
 				return
